@@ -1,0 +1,84 @@
+"""VM resource definitions for PostHog development."""
+
+from pulumi_gcp import compute
+
+from config import VMConfig
+from startup_scripts.full_startup import generate_startup_script
+
+
+def create_dev_vm(
+    vm_config: VMConfig,
+    network: compute.Network,
+    zone: str,
+) -> compute.Instance:
+    """Create a development VM for PostHog.
+
+    Args:
+        vm_config: VM configuration
+        network: VPC network to attach to
+        zone: GCP zone for the VM
+
+    Returns:
+        The created compute instance
+    """
+    # Generate the startup script based on configuration
+    startup_script = generate_startup_script(
+        posthog_branch=vm_config.posthog_branch,
+        additional_repos=vm_config.additional_repos,
+        enable_minimal_mode=vm_config.enable_minimal_mode,
+    )
+
+    # Prepare labels
+    labels = {
+        "purpose": "posthog-dev",
+        "managed-by": "pulumi",
+        "branch": vm_config.posthog_branch.replace("/", "-").replace("_", "-").lower(),
+        **vm_config.labels,
+    }
+
+    return compute.Instance(
+        vm_config.name,
+        name=vm_config.name,
+        machine_type=vm_config.machine_type,
+        zone=zone,
+        description=vm_config.description,
+        tags=["posthog-dev"],
+        labels=labels,
+        boot_disk=compute.InstanceBootDiskArgs(
+            initialize_params=compute.InstanceBootDiskInitializeParamsArgs(
+                image=vm_config.os_image,
+                size=vm_config.disk_size_gb,
+                type="pd-ssd",
+                labels=labels,
+            ),
+            auto_delete=True,
+        ),
+        network_interfaces=[
+            compute.InstanceNetworkInterfaceArgs(
+                network=network.id,
+                access_configs=[
+                    compute.InstanceNetworkInterfaceAccessConfigArgs(
+                        # Ephemeral public IP
+                        network_tier="PREMIUM",
+                    )
+                ],
+            )
+        ],
+        # Enable OS Login for simple SSH access
+        metadata={
+            "enable-oslogin": "TRUE",
+        },
+        # Startup script runs on first boot
+        metadata_startup_script=startup_script,
+        # Service account with minimal permissions
+        service_account=compute.InstanceServiceAccountArgs(
+            scopes=[
+                "https://www.googleapis.com/auth/logging.write",
+                "https://www.googleapis.com/auth/monitoring.write",
+            ],
+        ),
+        # Allow stopping for updates (e.g., changing machine type)
+        allow_stopping_for_update=True,
+        # Deletion protection off for dev VMs
+        deletion_protection=False,
+    )

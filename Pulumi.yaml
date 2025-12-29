@@ -1,0 +1,11 @@
+name: posthog-dev-pulumi
+description: GCP VMs for PostHog local development
+runtime:
+  name: python
+  options:
+    toolchain: uv
+    virtualenv: .venv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-python
