@@ -6,7 +6,7 @@ Provisions GCP VMs pre-configured for PostHog local development.
 import pulumi
 from pulumi import Config
 
-from config import load_allowed_ips, load_vm_configs
+from config import load_allowed_ips, load_monitoring_config, load_vm_configs
 from network import create_network, create_posthog_firewall, create_ssh_firewall
 from vm import create_dev_vm
 
@@ -27,6 +27,9 @@ def main():
     # Load allowed IPs for firewall
     allowed_ips = load_allowed_ips(config)
 
+    # Load monitoring configuration
+    monitoring = load_monitoring_config(config)
+
     # Create shared network resources
     network = create_network("posthog-dev-network")
 
@@ -44,6 +47,7 @@ def main():
             vm_config=vm_config,
             network=network,
             zone=zone,
+            monitoring=monitoring,
         )
 
         # Export VM details

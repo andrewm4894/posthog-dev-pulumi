@@ -1,31 +1,67 @@
 """Generate complete startup script for PostHog development VMs."""
 
-from config import RepoConfig
+from config import MonitoringConfig, RepoConfig
 
 
 def generate_startup_script(
     posthog_branch: str = "master",
     additional_repos: list[RepoConfig] | None = None,
     enable_minimal_mode: bool = False,
+    monitoring: MonitoringConfig | None = None,
 ) -> str:
     """Generate a complete startup script for PostHog development.
 
     The script:
     1. Updates system packages
-    2. Installs Docker and Docker Compose
-    3. Installs development dependencies (Python, Node, pnpm, uv, mprocs)
-    4. Clones PostHog and optional additional repositories
-    5. Prepares the environment for running bin/start
+    2. Installs monitoring agents (GCP Ops Agent, Netdata)
+    3. Installs Docker and Docker Compose
+    4. Installs development dependencies (Python, Node, pnpm, uv, mprocs)
+    5. Clones PostHog and optional additional repositories
+    6. Prepares the environment for running bin/start
 
     Args:
         posthog_branch: Git branch for PostHog repo
         additional_repos: List of additional repos to clone
         enable_minimal_mode: Whether to configure for minimal mode
+        monitoring: Monitoring agents configuration
 
     Returns:
         Complete bash startup script as string
     """
     additional_repos = additional_repos or []
+    monitoring = monitoring or MonitoringConfig()
+
+    # Build GCP Ops Agent installation
+    ops_agent_install = ""
+    if monitoring.ops_agent_enabled:
+        ops_agent_install = '''
+# ========================================
+# 2a. Install GCP Ops Agent
+# ========================================
+echo ">>> Installing GCP Ops Agent"
+curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+bash add-google-cloud-ops-agent-repo.sh --also-install
+rm add-google-cloud-ops-agent-repo.sh
+systemctl enable google-cloud-ops-agent
+echo ">>> GCP Ops Agent installed"
+'''
+
+    # Build Netdata installation
+    netdata_install = ""
+    if monitoring.netdata_enabled and monitoring.netdata_claim_token:
+        netdata_install = f'''
+# ========================================
+# 2b. Install Netdata
+# ========================================
+echo ">>> Installing Netdata"
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive \\
+    --claim-token {monitoring.netdata_claim_token} \\
+    --claim-rooms {monitoring.netdata_claim_rooms} \\
+    --claim-url {monitoring.netdata_claim_url}
+rm /tmp/netdata-kickstart.sh
+echo ">>> Netdata installed and claimed"
+'''
 
     # Build the additional repos clone commands
     additional_clone_commands = ""
@@ -37,7 +73,8 @@ chown -R posthog-dev:posthog-dev /home/posthog-dev/{repo.target_dir}
 '''
 
     minimal_env = 'export POSTHOG_MINIMAL_MODE="true"' if enable_minimal_mode else ""
-    start_cmd = "./bin/start --minimal" if enable_minimal_mode else "./bin/start"
+    # Use mprocs-with-logging.yaml by default for file-based logging
+    start_cmd = "./bin/start --minimal" if enable_minimal_mode else "./bin/start --custom bin/mprocs-with-logging.yaml"
 
     script = f'''#!/bin/bash
 #
@@ -60,6 +97,8 @@ echo ">>> Updating system packages"
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
+{ops_agent_install}
+{netdata_install}
 # ========================================
 # 2. Install Docker
 # ========================================
@@ -127,11 +166,12 @@ apt-get install -y \\
     pkg-config
 
 # Install Python 3.12 (required by PostHog)
+# NOTE: Do NOT change system python3 - it breaks apt tools
 echo ">>> Installing Python 3.12"
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
 apt-get install -y python3.12 python3.12-venv python3.12-dev
-update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+# Only set 'python' to point to 3.12, leave python3 as system default
 update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
 # Install uv (fast Python package manager)
@@ -141,10 +181,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cp /root/.local/bin/uv /usr/local/bin/
 chmod +x /usr/local/bin/uv
 
-# Install Node.js 20 LTS
+# Install Node.js 20 LTS (using official binary to avoid apt issues)
 echo ">>> Installing Node.js 20"
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+NODE_VERSION="v20.18.1"
+NODE_DISTRO="linux-x64"
+wget -q "https://nodejs.org/dist/${{NODE_VERSION}}/node-${{NODE_VERSION}}-${{NODE_DISTRO}}.tar.xz" -O /tmp/node.tar.xz
+tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+rm /tmp/node.tar.xz
+node --version
+npm --version
 
 # Install pnpm
 echo ">>> Installing pnpm"
@@ -213,11 +258,12 @@ export POSTHOG_DIR="$HOME/posthog"
 
 # Convenience aliases
 alias ph='cd $POSTHOG_DIR'
-alias phstart='cd $POSTHOG_DIR && ./bin/start'
+alias phstart='cd $POSTHOG_DIR && ./bin/start --custom bin/mprocs-with-logging.yaml'
 alias phminimal='cd $POSTHOG_DIR && ./bin/start --minimal'
 alias phlogs='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml logs -f'
 alias phps='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml ps'
 alias phdown='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml down'
+alias phtail='tail -f /tmp/posthog-*.log'
 
 echo ""
 echo "========================================"
@@ -225,12 +271,14 @@ echo "PostHog Development VM Ready!"
 echo "========================================"
 echo ""
 echo "Quick commands:"
-echo "  phstart     - Start PostHog (full mode)"
+echo "  phstart     - Start PostHog (with logging to /tmp/posthog-*.log)"
 echo "  phminimal   - Start PostHog (minimal mode)"
+echo "  phtail      - Tail all PostHog log files"
 echo "  phlogs      - View Docker container logs"
 echo "  phps        - Show Docker container status"
 echo "  phdown      - Stop Docker containers"
 echo ""
+echo "Log files: /tmp/posthog-*.log"
 echo "PostHog directory: $POSTHOG_DIR"
 echo ""
 BASHRCEOF

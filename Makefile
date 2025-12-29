@@ -22,6 +22,60 @@ auth: ## Authenticate with GCP (required before first deploy)
 	@echo "$(BLUE)Setting up GCP authentication...$(NC)"
 	gcloud auth application-default login
 
+##@ Stack Management (one stack per VM)
+
+.PHONY: new-vm
+new-vm: ## Create a new VM stack (usage: make new-vm NAME=my-feature BRANCH=feature-branch)
+	@if [ -z "$(NAME)" ]; then \
+		echo "$(YELLOW)Usage: make new-vm NAME=vm-name [BRANCH=branch-name]$(NC)"; \
+		echo "Example: make new-vm NAME=feature-x BRANCH=feature-x-branch"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)Creating new stack '$(NAME)'...$(NC)"
+	pulumi stack init $(NAME)
+	pulumi config set gcp:project andrewm4894
+	pulumi config set gcp:region europe-west1
+	pulumi config set vmName posthog-$(NAME)
+	pulumi config set vmDescription "PostHog dev VM: $(NAME)"
+	@if [ -n "$(BRANCH)" ]; then \
+		pulumi config set posthogBranch $(BRANCH); \
+	fi
+	@if [ -n "$(IP)" ]; then \
+		pulumi config set allowedIps '["$(IP)/32"]'; \
+	else \
+		echo "$(YELLOW)Tip: Set your IP with: make set-ip IP=your.ip.here$(NC)"; \
+	fi
+	@echo "$(GREEN)Stack '$(NAME)' created! Run 'make up' to deploy.$(NC)"
+
+.PHONY: stacks
+stacks: ## List all stacks (VMs)
+	@echo "$(BLUE)Available stacks:$(NC)"
+	pulumi stack ls
+
+.PHONY: select
+select: ## Select a stack (usage: make select STACK=my-feature)
+	@if [ -z "$(STACK)" ]; then \
+		echo "$(YELLOW)Usage: make select STACK=stack-name$(NC)"; \
+		echo ""; \
+		echo "Available stacks:"; \
+		pulumi stack ls; \
+	else \
+		echo "$(BLUE)Selecting stack '$(STACK)'...$(NC)"; \
+		pulumi stack select $(STACK); \
+	fi
+
+.PHONY: current
+current: ## Show current stack and VM info
+	@echo "$(BLUE)Current stack:$(NC)"
+	@pulumi stack --show-name
+	@echo ""
+	@echo "$(BLUE)VM Configuration:$(NC)"
+	@pulumi config get vmName 2>/dev/null || echo "vmName: (not set)"
+	@pulumi config get posthogBranch 2>/dev/null || echo "posthogBranch: master (default)"
+	@echo ""
+	@echo "$(BLUE)Outputs:$(NC)"
+	@pulumi stack output 2>/dev/null || echo "(not deployed yet)"
+
 ##@ Deployment
 
 .PHONY: preview

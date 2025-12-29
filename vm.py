@@ -2,7 +2,7 @@
 
 from pulumi_gcp import compute
 
-from config import VMConfig
+from config import MonitoringConfig, VMConfig
 from startup_scripts.full_startup import generate_startup_script
 
 
@@ -10,6 +10,7 @@ def create_dev_vm(
     vm_config: VMConfig,
     network: compute.Network,
     zone: str,
+    monitoring: MonitoringConfig | None = None,
 ) -> compute.Instance:
     """Create a development VM for PostHog.
 
@@ -17,6 +18,7 @@ def create_dev_vm(
         vm_config: VM configuration
         network: VPC network to attach to
         zone: GCP zone for the VM
+        monitoring: Monitoring agents configuration
 
     Returns:
         The created compute instance
@@ -26,6 +28,7 @@ def create_dev_vm(
         posthog_branch=vm_config.posthog_branch,
         additional_repos=vm_config.additional_repos,
         enable_minimal_mode=vm_config.enable_minimal_mode,
+        monitoring=monitoring,
     )
 
     # Prepare labels

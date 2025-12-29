@@ -1,0 +1,48 @@
+# PostHog Development VMs Configuration
+# Edit this file and run `pulumi up` to apply changes
+
+# Default settings (applied to all VMs unless overridden)
+defaults:
+  machine_type: e2-standard-8
+  disk_size_gb: 100
+  zone: europe-west1-b
+  posthog_branch: master
+  enable_minimal_mode: false
+
+# Your allowed IPs - SET VIA PULUMI CONFIG, NOT HERE!
+# Run: pulumi config set allowedIps '["YOUR.IP.HERE/32"]'
+# These IPs can access PostHog ports (8010, 8000, 3000, etc.)
+# SSH is always open via GCP OS Login
+# allowed_ips:
+#   - YOUR.IP.HERE/32
+
+# Monitoring configuration
+monitoring:
+  # GCP Ops Agent - for Cloud Monitoring/Logging integration
+  ops_agent_enabled: true
+
+  # Netdata - for real-time monitoring dashboard
+  netdata_enabled: true
+  netdata_claim_url: https://app.netdata.cloud
+  netdata_claim_rooms: c88fcf94-d115-4628-9ea7-696c647317ac
+  # IMPORTANT: Store the claim token as a Pulumi secret:
+  #   pulumi config set --secret netdataClaimToken "YOUR_TOKEN"
+
+# VM definitions
+# Uncomment and modify to create VMs
+vms:
+  - name: posthog-dev-1
+    description: "PostHog development VM"
+    # posthog_branch: master  # uncomment to override default
+    # enable_minimal_mode: true  # uncomment for lighter resource usage
+
+  # Example: Feature branch VM
+  # - name: posthog-feature-x
+  #   description: "Testing feature X"
+  #   posthog_branch: feature-x-branch
+  #   enable_minimal_mode: true
+
+  # Example: PR review VM
+  # - name: posthog-pr-1234
+  #   description: "PR #1234 review"
+  #   posthog_branch: pr-1234-branch
