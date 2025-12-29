@@ -12,6 +12,11 @@ build/
 # Pulumi
 .pulumi/
 Pulumi.*.yaml.bak
+# Stack config files (contain user-specific config like IPs)
+Pulumi.dev.yaml
+Pulumi.prod.yaml
+Pulumi.*.yaml
+!Pulumi.yaml
 
 # IDE
 .vscode/
