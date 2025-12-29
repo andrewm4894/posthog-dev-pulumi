@@ -45,9 +45,11 @@ def create_posthog_firewall(
         allowed_ips: List of IP CIDRs allowed to access PostHog ports
 
     Opens ports:
+    - 3389: RDP (xrdp remote desktop)
     - 8010: PostHog main app (via Caddy proxy)
     - 8000: PostHog backend (direct)
-    - 3000: Frontend dev server (Vite)
+    - 8234: Frontend Vite dev server (for external JS loading)
+    - 3000: Frontend dev server (alternate port)
     - 8123: ClickHouse HTTP
     - 5555: Flower (Celery monitoring)
     - 1080: Maildev
@@ -61,13 +63,19 @@ def create_posthog_firewall(
         network=network.self_link,
         description="Allow traffic for PostHog development services",
         allows=[
+            # Remote Desktop
+            compute.FirewallAllowArgs(
+                protocol="tcp",
+                ports=["3389"],  # RDP (xrdp)
+            ),
             # PostHog core services
             compute.FirewallAllowArgs(
                 protocol="tcp",
                 ports=[
                     "8010",  # Main app (Caddy proxy)
                     "8000",  # Backend direct
-                    "3000",  # Frontend Vite dev server
+                    "8234",  # Frontend Vite dev server (JS/assets for external access)
+                    "3000",  # Frontend dev server (alternate)
                 ],
             ),
             # Development/debugging services

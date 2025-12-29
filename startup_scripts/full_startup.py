@@ -1,6 +1,15 @@
 """Generate complete startup script for PostHog development VMs."""
 
-from config import MonitoringConfig, RepoConfig
+import json
+
+from config import ClaudeCodeConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
+from constants import (
+    DEFAULT_MPROCS_CONFIG,
+    DOCKER_CONFIG,
+    FLOX_VERSION,
+    POSTHOG_ENV_DEFAULTS,
+    SYSCTL_SETTINGS,
+)
 
 
 def generate_startup_script(
@@ -8,28 +17,43 @@ def generate_startup_script(
     additional_repos: list[RepoConfig] | None = None,
     enable_minimal_mode: bool = False,
     monitoring: MonitoringConfig | None = None,
+    claude_code: ClaudeCodeConfig | None = None,
+    remote_desktop: RemoteDesktopConfig | None = None,
 ) -> str:
     """Generate a complete startup script for PostHog development.
 
-    The script:
+    The script uses Flox (PostHog's recommended approach) which manages:
+    - Python (via uv)
+    - Node.js 22
+    - mprocs
+    - Rust toolchain
+    - All other development dependencies
+
+    Steps:
     1. Updates system packages
     2. Installs monitoring agents (GCP Ops Agent, Netdata)
     3. Installs Docker and Docker Compose
-    4. Installs development dependencies (Python, Node, pnpm, uv, mprocs)
+    4. Installs Flox
     5. Clones PostHog and optional additional repositories
-    6. Prepares the environment for running bin/start
+    6. Activates Flox environment (installs all deps via on-activate hook)
+    7. Installs Claude Code (optional)
+    8. Installs Remote Desktop - XFCE + xrdp + Chrome (optional)
 
     Args:
         posthog_branch: Git branch for PostHog repo
         additional_repos: List of additional repos to clone
         enable_minimal_mode: Whether to configure for minimal mode
         monitoring: Monitoring agents configuration
+        claude_code: Claude Code installation configuration
+        remote_desktop: Remote desktop (xrdp) configuration
 
     Returns:
         Complete bash startup script as string
     """
     additional_repos = additional_repos or []
     monitoring = monitoring or MonitoringConfig()
+    claude_code = claude_code or ClaudeCodeConfig()
+    remote_desktop = remote_desktop or RemoteDesktopConfig()
 
     # Build GCP Ops Agent installation
     ops_agent_install = ""
@@ -63,6 +87,103 @@ rm /tmp/netdata-kickstart.sh
 echo ">>> Netdata installed and claimed"
 '''
 
+    # Build Claude Code installation (binary only - user config happens after user creation)
+    claude_code_binary_install = ""
+    claude_code_user_config = ""
+    if claude_code.enabled and claude_code.api_key:
+        claude_code_binary_install = '''
+# ========================================
+# 2c. Install Claude Code (binary)
+# ========================================
+echo ">>> Installing Claude Code binary"
+curl -fsSL https://claude.ai/install.sh | bash
+echo ">>> Claude Code binary installed (user config will be done after user creation)"
+'''
+        claude_code_user_config = f'''
+# ========================================
+# 3b. Configure Claude Code for posthog-dev user
+# ========================================
+echo ">>> Configuring Claude Code for posthog-dev user"
+
+# Create Claude Code configuration directory for posthog-dev user
+mkdir -p /home/posthog-dev/.claude
+
+# Create settings.json with API key and permissions for headless use
+cat > /home/posthog-dev/.claude/settings.json << 'CLAUDEEOF'
+{{
+  "permissions": {{
+    "allow": ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch"]
+  }}
+}}
+CLAUDEEOF
+
+# Set environment variable for API key in user's profile
+cat >> /home/posthog-dev/.bashrc << 'CLAUDEENVEOF'
+
+# Claude Code configuration
+export ANTHROPIC_API_KEY="{claude_code.api_key}"
+export PATH="$HOME/.local/bin:$PATH"
+alias claude='~/.local/bin/claude'
+CLAUDEENVEOF
+
+chown -R posthog-dev:posthog-dev /home/posthog-dev/.claude
+echo ">>> Claude Code configured for posthog-dev user"
+'''
+
+    # Build Remote Desktop (xrdp + XFCE + Chrome) installation
+    remote_desktop_install = ""
+    if remote_desktop.enabled and remote_desktop.password:
+        remote_desktop_install = f'''
+# ========================================
+# 2d. Install Remote Desktop (xrdp + XFCE + Chrome)
+# ========================================
+echo ">>> Installing XFCE desktop environment"
+DEBIAN_FRONTEND=noninteractive apt-get install -y \\
+    xfce4 xfce4-goodies \\
+    dbus-x11 \\
+    xorg
+
+echo ">>> Installing xrdp (RDP server)"
+apt-get install -y xrdp
+
+# Add xrdp user to ssl-cert group (required for TLS)
+usermod -aG ssl-cert xrdp
+
+echo ">>> Installing Chrome browser"
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+apt-get update
+apt-get install -y google-chrome-stable
+
+echo ">>> Installing Chrome Remote Desktop"
+wget -q https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb -O /tmp/crd.deb
+apt-get install -y /tmp/crd.deb || apt-get install -y -f
+rm /tmp/crd.deb
+
+# Add posthog-dev to chrome-remote-desktop group
+usermod -aG chrome-remote-desktop posthog-dev
+
+# Configure Chrome Remote Desktop to use XFCE
+mkdir -p /home/posthog-dev/.chrome-remote-desktop-session
+echo "exec /usr/bin/xfce4-session" > /home/posthog-dev/.chrome-remote-desktop-session
+chmod +x /home/posthog-dev/.chrome-remote-desktop-session
+chown posthog-dev:posthog-dev /home/posthog-dev/.chrome-remote-desktop-session
+
+# Configure XFCE as the session for xrdp
+echo "xfce4-session" > /home/posthog-dev/.xsession
+chown posthog-dev:posthog-dev /home/posthog-dev/.xsession
+
+# Set password for posthog-dev user (for RDP login)
+echo "posthog-dev:{remote_desktop.password}" | chpasswd
+
+# Enable and start xrdp
+systemctl enable xrdp
+systemctl start xrdp
+
+echo ">>> Remote Desktop installed - connect via RDP to port 3389"
+echo ">>> Username: posthog-dev"
+'''
+
     # Build the additional repos clone commands
     additional_clone_commands = ""
     for repo in additional_repos:
@@ -73,13 +194,28 @@ chown -R posthog-dev:posthog-dev /home/posthog-dev/{repo.target_dir}
 '''
 
     minimal_env = 'export POSTHOG_MINIMAL_MODE="true"' if enable_minimal_mode else ""
-    # Use mprocs-with-logging.yaml by default for file-based logging
-    start_cmd = "./bin/start --minimal" if enable_minimal_mode else "./bin/start --custom bin/mprocs-with-logging.yaml"
+    # Use hogli start (Flox-managed) with appropriate flags
+    # Default to mprocs-with-logging.yaml for file-based logging (useful for code agents)
+    start_cmd = "hogli start --minimal" if enable_minimal_mode else f"hogli start --custom {DEFAULT_MPROCS_CONFIG}"
+
+    # Generate Docker config JSON
+    docker_config_json = json.dumps(DOCKER_CONFIG, indent=4)
+
+    # Generate sysctl settings
+    sysctl_lines = "\n".join(f"{k}={v}" for k, v in SYSCTL_SETTINGS.items())
+
+    # Generate .env file content
+    env_lines = "\n".join(f"{k}={v}" for k, v in POSTHOG_ENV_DEFAULTS.items())
+    if minimal_env:
+        env_lines += "\nPOSTHOG_MINIMAL_MODE=true"
 
     script = f'''#!/bin/bash
 #
 # PostHog Development VM Startup Script
 # Generated by posthog-dev-pulumi
+#
+# Uses Flox for dependency management (PostHog's recommended approach)
+# See: https://posthog.com/handbook/engineering/developing-locally#setup-with-flox-recommended
 #
 set -ex
 
@@ -99,6 +235,8 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 {ops_agent_install}
 {netdata_install}
+{claude_code_binary_install}
+{remote_desktop_install}
 # ========================================
 # 2. Install Docker
 # ========================================
@@ -122,14 +260,7 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 
 # Configure Docker for better performance
 cat > /etc/docker/daemon.json << 'DOCKEREOF'
-{{
-    "log-driver": "json-file",
-    "log-opts": {{
-        "max-size": "100m",
-        "max-file": "3"
-    }},
-    "storage-driver": "overlay2"
-}}
+{docker_config_json}
 DOCKEREOF
 
 systemctl restart docker
@@ -143,12 +274,13 @@ if ! id posthog-dev &>/dev/null; then
 fi
 usermod -aG docker posthog-dev
 
+{claude_code_user_config}
 # ========================================
-# 4. Install Development Dependencies
+# 4. Install System Dependencies
 # ========================================
-echo ">>> Installing development dependencies"
+echo ">>> Installing system dependencies"
 
-# Build essentials and common tools
+# Build essentials and common tools (Flox handles dev tools)
 apt-get install -y \\
     build-essential \\
     git \\
@@ -158,127 +290,272 @@ apt-get install -y \\
     htop \\
     jq \\
     unzip \\
-    brotli \\
-    libpq-dev \\
-    libffi-dev \\
-    libssl-dev \\
-    python3-dev \\
-    pkg-config
-
-# Install Python 3.12 (required by PostHog)
-# NOTE: Do NOT change system python3 - it breaks apt tools
-echo ">>> Installing Python 3.12"
-add-apt-repository -y ppa:deadsnakes/ppa
-apt-get update
-apt-get install -y python3.12 python3.12-venv python3.12-dev
-# Only set 'python' to point to 3.12, leave python3 as system default
-update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
-
-# Install uv (fast Python package manager)
-echo ">>> Installing uv"
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# Make uv available system-wide
-cp /root/.local/bin/uv /usr/local/bin/
-chmod +x /usr/local/bin/uv
-
-# Install Node.js 20 LTS (using official binary to avoid apt issues)
-echo ">>> Installing Node.js 20"
-NODE_VERSION="v20.18.1"
-NODE_DISTRO="linux-x64"
-wget -q "https://nodejs.org/dist/${{NODE_VERSION}}/node-${{NODE_VERSION}}-${{NODE_DISTRO}}.tar.xz" -O /tmp/node.tar.xz
-tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
-rm /tmp/node.tar.xz
-node --version
-npm --version
-
-# Install pnpm
-echo ">>> Installing pnpm"
-npm install -g pnpm
-
-# Install mprocs (process orchestrator)
-echo ">>> Installing mprocs"
-MPROCS_VERSION="0.7.1"
-wget -q "https://github.com/pvolok/mprocs/releases/download/v${{MPROCS_VERSION}}/mprocs-${{MPROCS_VERSION}}-linux64.tar.gz" -O /tmp/mprocs.tar.gz
-tar -xzf /tmp/mprocs.tar.gz -C /usr/local/bin/
-chmod +x /usr/local/bin/mprocs
-
-# Install Rust (needed for some PostHog components)
-echo ">>> Installing Rust"
-su - posthog-dev -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+    screen
 
 # ========================================
-# 5. Clone Repositories
+# 5. Install Flox
+# ========================================
+echo ">>> Installing Flox (PostHog's recommended dev environment manager)"
+
+# Install Flox via .deb package - see https://flox.dev/docs/install-flox/install/
+wget -q "https://downloads.flox.dev/by-env/stable/deb/flox-{FLOX_VERSION}.x86_64-linux.deb" -O /tmp/flox.deb
+dpkg -i /tmp/flox.deb
+rm /tmp/flox.deb
+
+echo ">>> Flox installed"
+flox --version
+
+# Configure Flox to disable direnv prompts (enables headless/non-interactive activation)
+echo ">>> Configuring Flox for headless operation"
+mkdir -p /home/posthog-dev/.config/flox
+cat > /home/posthog-dev/.config/flox/flox.toml << 'FLOXCONFIGEOF'
+[features]
+direnv = false
+FLOXCONFIGEOF
+chown -R posthog-dev:posthog-dev /home/posthog-dev/.config
+
+# ========================================
+# 6. Clone Repositories
 # ========================================
 echo ">>> Cloning PostHog repository (branch: {posthog_branch})"
-git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/posthog-dev/posthog
+
+# Check if branch exists remotely
+if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
+    echo ">>> Branch '{posthog_branch}' exists, cloning directly"
+    git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/posthog-dev/posthog
+else
+    echo ">>> Branch '{posthog_branch}' does not exist, cloning master and creating new branch"
+    git clone https://github.com/posthog/posthog.git /home/posthog-dev/posthog
+    cd /home/posthog-dev/posthog
+    git checkout -b {posthog_branch}
+    cd /
+fi
+
 chown -R posthog-dev:posthog-dev /home/posthog-dev/posthog
 
 {additional_clone_commands}
 
 # ========================================
-# 6. Setup PostHog Environment
+# 7. Setup PostHog Environment
 # ========================================
 echo ">>> Setting up PostHog environment"
 
 # Create environment file
 cat > /home/posthog-dev/posthog/.env << 'ENVEOF'
-DEBUG=1
-SKIP_SERVICE_VERSION_REQUIREMENTS=1
-SECRET_KEY=dev-secret-key-not-for-production
-DATABASE_URL=postgres://posthog:posthog@localhost:5432/posthog
-REDIS_URL=redis://localhost:6379/
-CLICKHOUSE_HOST=localhost
-{minimal_env}
+{env_lines}
 ENVEOF
 
 chown posthog-dev:posthog-dev /home/posthog-dev/posthog/.env
 
-# Download GeoLite2 database
-echo ">>> Downloading GeoLite2 database"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && ./bin/download-mmdb" || true
+# Create simple PostHog start script (localhost access via Remote Desktop)
+cat > /home/posthog-dev/start-posthog.sh << 'STARTSCRIPTEOF'
+#!/bin/bash
+# Simple PostHog start script (localhost access via RDP)
+# Generated by posthog-dev-pulumi startup script
+cd /home/posthog-dev/posthog
+FLOX_NO_DIRENV_SETUP=1 exec flox activate -- mprocs --config bin/mprocs-with-logging.yaml
+STARTSCRIPTEOF
 
-# Install Python dependencies with uv
-echo ">>> Installing Python dependencies"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && uv sync" || true
-
-# Install Node dependencies
-echo ">>> Installing Node dependencies"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && pnpm install" || true
+chmod +x /home/posthog-dev/start-posthog.sh
+chown posthog-dev:posthog-dev /home/posthog-dev/start-posthog.sh
+echo ">>> Created /home/posthog-dev/start-posthog.sh"
 
 # ========================================
-# 7. Setup Shell Environment
+# 8. Configure /etc/hosts for PostHog services
+# ========================================
+echo ">>> Configuring /etc/hosts for PostHog services"
+# Add required entries to /etc/hosts if not present (needed for Docker service resolution)
+if ! grep -q "kafka clickhouse clickhouse-coordinator objectstorage" /etc/hosts; then
+    echo "127.0.0.1 kafka clickhouse clickhouse-coordinator objectstorage" >> /etc/hosts
+    echo ">>> /etc/hosts amended for PostHog services"
+else
+    echo ">>> /etc/hosts already contains required entries"
+fi
+
+# ========================================
+# 8a. Activate Flox Environment
+# ========================================
+echo ">>> Activating Flox environment (this installs all dependencies)"
+echo ">>> This may take several minutes on first run..."
+
+# Run flox activate in non-interactive mode to install all dependencies
+# The on-activate hook in .flox/env/manifest.toml handles:
+# - Python environment setup (uv sync)
+# - Node.js dependencies (pnpm install)
+# Note: /etc/hosts already configured above (Flox can't sudo in non-interactive mode)
+# FLOX_NO_DIRENV_SETUP=1 prevents interactive direnv setup prompt
+su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 'Flox environment activated'" || true
+
+# Download GeoLite2 database
+echo ">>> Downloading GeoLite2 database"
+su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
+
+# ========================================
+# 8b. Start Docker Services & Run Migrations
+# ========================================
+echo ">>> Starting Docker services"
+# Use || true to continue even if some containers fail (e.g., port conflicts with otel-collector)
+su - posthog-dev -c "cd /home/posthog-dev/posthog && docker compose -f docker-compose.dev.yml up -d" || true
+
+echo ">>> Waiting for Docker services to be ready..."
+sleep 30
+
+# Ensure critical services are running (db, redis, clickhouse, kafka)
+echo ">>> Verifying critical services..."
+su - posthog-dev -c "cd /home/posthog-dev/posthog && docker compose -f docker-compose.dev.yml ps db redis clickhouse kafka"
+
+echo ">>> Running database migrations"
+su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate" || true
+
+# ========================================
+# 8c. Create Makefile for Common Commands
+# ========================================
+echo ">>> Creating Makefile"
+
+cat > /home/posthog-dev/posthog/Makefile.dev << 'MAKEFILEEOF'
+# PostHog Development VM - Handy Commands
+# Usage: make -f Makefile.dev <target>
+
+.PHONY: start start-minimal attach logs ps down migrate demo-data restart clean help
+
+# Start PostHog (with logging)
+start:
+	FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --custom bin/mprocs-with-logging.yaml
+
+# Start PostHog in minimal mode
+start-minimal:
+	FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --minimal
+
+# Attach to running PostHog screen session
+attach:
+	screen -r posthog
+
+# View Docker logs
+logs:
+	docker compose -f docker-compose.dev.yml logs -f
+
+# Show Docker container status
+ps:
+	docker compose -f docker-compose.dev.yml ps
+
+# Stop Docker containers
+down:
+	docker compose -f docker-compose.dev.yml down
+
+# Run database migrations
+migrate:
+	FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate
+
+# Generate demo data
+demo-data:
+	FLOX_NO_DIRENV_SETUP=1 flox activate -- python manage.py generate_demo_data
+
+# Restart Docker services
+restart:
+	docker compose -f docker-compose.dev.yml down
+	docker compose -f docker-compose.dev.yml up -d
+
+# Clean up everything (Docker volumes, caches)
+clean:
+	docker compose -f docker-compose.dev.yml down -v
+	rm -rf node_modules .venv
+
+# Tail PostHog log files
+tail:
+	tail -f /tmp/posthog-*.log
+
+# Show help
+help:
+	@echo "PostHog Development VM Commands"
+	@echo ""
+	@echo "  make -f Makefile.dev start        - Start PostHog (with logging)"
+	@echo "  make -f Makefile.dev start-minimal - Start PostHog (minimal mode)"
+	@echo "  make -f Makefile.dev attach       - Attach to running screen session"
+	@echo "  make -f Makefile.dev logs         - View Docker logs"
+	@echo "  make -f Makefile.dev ps           - Show Docker status"
+	@echo "  make -f Makefile.dev down         - Stop Docker containers"
+	@echo "  make -f Makefile.dev migrate      - Run database migrations"
+	@echo "  make -f Makefile.dev demo-data    - Generate demo data"
+	@echo "  make -f Makefile.dev restart      - Restart Docker services"
+	@echo "  make -f Makefile.dev clean        - Clean up everything"
+	@echo "  make -f Makefile.dev tail         - Tail log files"
+	@echo ""
+MAKEFILEEOF
+
+chown posthog-dev:posthog-dev /home/posthog-dev/posthog/Makefile.dev
+
+# ========================================
+# 8d. Start PostHog in Screen Session
+# ========================================
+echo ">>> Starting PostHog in background screen session"
+
+# Wait a bit for migrations to settle
+sleep 10
+
+# Start PostHog in a detached screen session using the start script
+# The start script:
+# - Sets JS_URL/JS_POSTHOG_UI_HOST to external IP for browser access
+# - Sources the Python venv (flox profile scripts only run for interactive shells)
+# - Runs mprocs via flox activate
+su - posthog-dev -c "screen -dmS posthog /home/posthog-dev/start-posthog.sh"
+
+echo ">>> PostHog started in screen session 'posthog'"
+echo ">>> Attach with: screen -r posthog"
+
+# ========================================
+# 9. Setup Shell Environment
 # ========================================
 echo ">>> Configuring shell environment"
 
 cat >> /home/posthog-dev/.bashrc << 'BASHRCEOF'
 
-# PostHog Development Environment
-export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+# PostHog Development Environment (Flox-based)
 export POSTHOG_DIR="$HOME/posthog"
+
+# Auto-activate Flox when entering PostHog directory
+cd() {{
+    builtin cd "$@"
+    if [[ "$PWD" == "$POSTHOG_DIR"* ]] && [[ -d "$POSTHOG_DIR/.flox" ]]; then
+        if [[ -z "$FLOX_ENV" ]]; then
+            echo "Activating Flox environment..."
+            eval "$(FLOX_NO_DIRENV_SETUP=1 flox activate)"
+        fi
+    fi
+}}
 
 # Convenience aliases
 alias ph='cd $POSTHOG_DIR'
-alias phstart='cd $POSTHOG_DIR && ./bin/start --custom bin/mprocs-with-logging.yaml'
-alias phminimal='cd $POSTHOG_DIR && ./bin/start --minimal'
+alias phattach='screen -r posthog'
+alias phstart='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --custom bin/mprocs-with-logging.yaml'
+alias phminimal='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --minimal'
 alias phlogs='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml logs -f'
 alias phps='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml ps'
 alias phdown='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml down'
 alias phtail='tail -f /tmp/posthog-*.log'
+alias phmake='make -f $POSTHOG_DIR/Makefile.dev'
+alias floxsh='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate'
 
 echo ""
 echo "========================================"
-echo "PostHog Development VM Ready!"
+echo "PostHog Development VM Ready! (Flox)"
 echo "========================================"
 echo ""
+echo "PostHog is running in a screen session!"
+echo ""
 echo "Quick commands:"
-echo "  phstart     - Start PostHog (with logging to /tmp/posthog-*.log)"
-echo "  phminimal   - Start PostHog (minimal mode)"
+echo "  phattach    - Attach to running PostHog (screen session)"
 echo "  phtail      - Tail all PostHog log files"
 echo "  phlogs      - View Docker container logs"
 echo "  phps        - Show Docker container status"
 echo "  phdown      - Stop Docker containers"
+echo "  phmake help - Show all make commands"
 echo ""
-echo "Log files: /tmp/posthog-*.log"
+echo "To attach to mprocs:"
+echo "  phattach"
+echo "  (Ctrl+A, D to detach without stopping)"
+echo ""
+echo "In mprocs, press 'r' on generate-demo-data to create test data."
+echo ""
 echo "PostHog directory: $POSTHOG_DIR"
 echo ""
 BASHRCEOF
@@ -286,15 +563,14 @@ BASHRCEOF
 chown posthog-dev:posthog-dev /home/posthog-dev/.bashrc
 
 # ========================================
-# 8. Final Setup
+# 10. Final Setup
 # ========================================
 echo ">>> Running final setup"
 
-# Increase system limits for Docker
+# Increase system limits for Docker/ClickHouse
 cat >> /etc/sysctl.conf << 'SYSCTLEOF'
-# Docker optimizations
-vm.max_map_count=262144
-fs.file-max=65536
+# Docker/ClickHouse optimizations
+{sysctl_lines}
 SYSCTLEOF
 sysctl -p
 
@@ -306,10 +582,32 @@ echo "========================================"
 echo "PostHog Dev VM Startup Complete - $(date)"
 echo "========================================"
 echo ""
-echo "To start PostHog:"
-echo "  1. SSH into the VM"
-echo "  2. Switch to dev user: sudo su - posthog-dev"
-echo "  3. Start PostHog: {start_cmd}"
+echo "PostHog is running in a screen session!"
+echo ""
+echo "ACCESS OPTIONS:"
+echo ""
+echo "  Chrome Remote Desktop (one-time setup required):"
+echo "    1. SSH to VM: gcloud compute ssh <vm-name> --zone=europe-west1-b"
+echo "    2. Switch user: sudo su - posthog-dev"
+echo "    3. Go to: https://remotedesktop.google.com/headless"
+echo "    4. Click 'Begin' > 'Next' > 'Authorize'"
+echo "    5. Copy the Debian Linux command and run it on the VM"
+echo "    6. Set a PIN when prompted"
+echo "    7. Then connect via: https://remotedesktop.google.com/access"
+echo ""
+echo "  xrdp (alternative - no setup needed):"
+echo "    Connect to <external-ip>:3389 with any RDP client"
+echo "    Username: posthog-dev"
+echo ""
+echo "  SSH:"
+echo "    gcloud compute ssh <vm-name> --zone=europe-west1-b"
+echo "    sudo su - posthog-dev"
+echo "    phattach  (attach to mprocs)"
+echo ""
+echo "Detach from screen: Ctrl+A, D"
+echo "In mprocs, press 'r' on generate-demo-data to create test data."
+echo ""
+echo "Makefile commands: phmake help"
 echo ""
 '''
 

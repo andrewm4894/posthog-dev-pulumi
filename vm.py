@@ -2,7 +2,7 @@
 
 from pulumi_gcp import compute
 
-from config import MonitoringConfig, VMConfig
+from config import ClaudeCodeConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
 from startup_scripts.full_startup import generate_startup_script
 
 
@@ -11,6 +11,8 @@ def create_dev_vm(
     network: compute.Network,
     zone: str,
     monitoring: MonitoringConfig | None = None,
+    claude_code: ClaudeCodeConfig | None = None,
+    remote_desktop: RemoteDesktopConfig | None = None,
 ) -> compute.Instance:
     """Create a development VM for PostHog.
 
@@ -19,6 +21,8 @@ def create_dev_vm(
         network: VPC network to attach to
         zone: GCP zone for the VM
         monitoring: Monitoring agents configuration
+        claude_code: Claude Code installation configuration
+        remote_desktop: Remote desktop (xrdp) configuration
 
     Returns:
         The created compute instance
@@ -29,6 +33,8 @@ def create_dev_vm(
         additional_repos=vm_config.additional_repos,
         enable_minimal_mode=vm_config.enable_minimal_mode,
         monitoring=monitoring,
+        claude_code=claude_code,
+        remote_desktop=remote_desktop,
     )
 
     # Prepare labels

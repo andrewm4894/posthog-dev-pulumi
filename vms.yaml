@@ -28,19 +28,32 @@ monitoring:
   # IMPORTANT: Store the claim token as a Pulumi secret:
   #   pulumi config set --secret netdataClaimToken "YOUR_TOKEN"
 
+# Claude Code configuration
+claude_code:
+  # Enable Claude Code installation on VMs
+  enabled: true
+  # IMPORTANT: Store the API key as a Pulumi secret:
+  #   pulumi config set --secret anthropicApiKey "YOUR_API_KEY"
+
+# Remote Desktop (xrdp) configuration
+remote_desktop:
+  # Enable XFCE desktop + xrdp for RDP access
+  enabled: true
+  # IMPORTANT: Store the password as a Pulumi secret:
+  #   pulumi config set --secret rdpPassword "YourSecurePassword123"
+  # Connect with any RDP client to <external-ip>:3389
+  # Username: posthog-dev
+
 # VM definitions
 # Uncomment and modify to create VMs
 vms:
-  - name: posthog-dev-1
-    description: "PostHog development VM"
-    # posthog_branch: master  # uncomment to override default
-    # enable_minimal_mode: true  # uncomment for lighter resource usage
+  - name: posthog-master
+    description: "PostHog master branch"
+    # posthog_branch: master  # uses default
 
-  # Example: Feature branch VM
-  # - name: posthog-feature-x
-  #   description: "Testing feature X"
-  #   posthog_branch: feature-x-branch
-  #   enable_minimal_mode: true
+  # - name: posthog-feat-llma-bool-evals-with-na
+  #   description: "PostHog feature branch - LLM bool evals with NA"
+  #   posthog_branch: feat/llma-bool-evals-with-na
 
   # Example: PR review VM
   # - name: posthog-pr-1234

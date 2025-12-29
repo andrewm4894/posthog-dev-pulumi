@@ -50,12 +50,30 @@ class MonitoringConfig:
 
 
 @dataclass
+class ClaudeCodeConfig:
+    """Configuration for Claude Code installation."""
+
+    enabled: bool = True
+    api_key: str = ""  # Loaded from Pulumi secret
+
+
+@dataclass
+class RemoteDesktopConfig:
+    """Configuration for Remote Desktop (xrdp) access."""
+
+    enabled: bool = True
+    password: str = ""  # Loaded from Pulumi secret
+
+
+@dataclass
 class VMsYamlConfig:
     """Configuration loaded from vms.yaml file."""
 
     defaults: dict
     vms: list[dict]
     monitoring: dict
+    claude_code: dict
+    remote_desktop: dict
 
 
 def _load_yaml_config() -> Optional[VMsYamlConfig]:
@@ -71,6 +89,8 @@ def _load_yaml_config() -> Optional[VMsYamlConfig]:
         defaults=data.get("defaults", {}),
         vms=data.get("vms", []),
         monitoring=data.get("monitoring", {}),
+        claude_code=data.get("claude_code", {}),
+        remote_desktop=data.get("remote_desktop", {}),
     )
 
 
@@ -169,6 +189,42 @@ def load_monitoring_config(config: Config) -> MonitoringConfig:
         netdata_claim_url=monitoring.get("netdata_claim_url", "https://app.netdata.cloud"),
         netdata_claim_rooms=monitoring.get("netdata_claim_rooms", ""),
         netdata_claim_token=netdata_claim_token,
+    )
+
+
+def load_claude_code_config(config: Config) -> ClaudeCodeConfig:
+    """Load Claude Code configuration from vms.yaml and Pulumi secrets.
+
+    Returns:
+        ClaudeCodeConfig with Claude Code settings
+    """
+    yaml_config = _load_yaml_config()
+    claude_code = yaml_config.claude_code if yaml_config else {}
+
+    # API key is stored as a Pulumi secret
+    api_key = config.get("anthropicApiKey") or ""
+
+    return ClaudeCodeConfig(
+        enabled=claude_code.get("enabled", True),
+        api_key=api_key,
+    )
+
+
+def load_remote_desktop_config(config: Config) -> RemoteDesktopConfig:
+    """Load Remote Desktop (xrdp) configuration from vms.yaml and Pulumi secrets.
+
+    Returns:
+        RemoteDesktopConfig with xrdp settings
+    """
+    yaml_config = _load_yaml_config()
+    remote_desktop = yaml_config.remote_desktop if yaml_config else {}
+
+    # Password is stored as a Pulumi secret
+    password = config.get("rdpPassword") or ""
+
+    return RemoteDesktopConfig(
+        enabled=remote_desktop.get("enabled", True),
+        password=password,
     )
 
 
