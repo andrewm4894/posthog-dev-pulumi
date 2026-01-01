@@ -8,7 +8,7 @@ import pulumi
 from pulumi import Config
 
 from config import load_claude_code_config, load_codex_cli_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
-from network import create_network, create_ssh_firewall
+from network import create_cloud_nat, create_cloud_router, create_iap_ssh_firewall, create_network
 from vm import create_dev_vm
 
 
@@ -40,8 +40,12 @@ def main():
     # Create shared network resources
     network = create_network("posthog-dev-network")
 
-    # Create SSH firewall rule (only port needed - Chrome Remote Desktop uses Google's relay)
-    ssh_firewall = create_ssh_firewall("posthog-dev-ssh", network)
+    # Create Cloud Router and NAT for outbound internet (VMs have no external IPs)
+    router = create_cloud_router("posthog-dev-router", network, region)
+    nat = create_cloud_nat("posthog-dev-nat", router, region)
+
+    # Create IAP SSH firewall rule (allows SSH only via IAP tunneling, not public internet)
+    ssh_firewall = create_iap_ssh_firewall("posthog-dev-iap-ssh", network)
 
     # Create VMs based on configuration
     for vm_config in vm_configs:
@@ -55,11 +59,7 @@ def main():
             codex_cli=codex_cli,
         )
 
-        # Export VM details
-        pulumi.export(
-            f"{vm_config.name}_external_ip",
-            vm.network_interfaces[0].access_configs[0].nat_ip,
-        )
+        # Export VM details (no external IP - use IAP tunneling)
         pulumi.export(
             f"{vm_config.name}_internal_ip",
             vm.network_interfaces[0].network_ip,
@@ -69,6 +69,7 @@ def main():
             pulumi.Output.concat(
                 "gcloud compute ssh ",
                 vm.name,
+                " --tunnel-through-iap",
                 " --zone=",
                 zone,
                 " --project=",

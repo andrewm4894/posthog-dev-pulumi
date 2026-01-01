@@ -68,12 +68,7 @@ def create_dev_vm(
         network_interfaces=[
             compute.InstanceNetworkInterfaceArgs(
                 network=network.id,
-                access_configs=[
-                    compute.InstanceNetworkInterfaceAccessConfigArgs(
-                        # Ephemeral public IP
-                        network_tier="PREMIUM",
-                    )
-                ],
+                # No external IP - use IAP tunneling for SSH, Cloud NAT for outbound
             )
         ],
         # Enable OS Login for simple SSH access

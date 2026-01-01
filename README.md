@@ -59,8 +59,8 @@ defaults:
   posthog_branch: master
 
 vms:
-  - name: posthog-master
-    description: "PostHog master branch"
+  - name: posthog-dev-1
+    description: "PostHog development VM"
 
   - name: posthog-feature-x
     description: "Feature X development"
@@ -77,13 +77,14 @@ pulumi config set machineType e2-standard-4
 pulumi config set diskSizeGb 150
 ```
 
-### Secrets (via Pulumi only)
+### Secrets & User Config (via Pulumi only)
 
 ```bash
 pulumi config set --secret rdpPassword "PASSWORD"      # Required for Chrome Remote Desktop
 pulumi config set --secret anthropicApiKey "KEY"       # Optional: Claude Code
 pulumi config set --secret openaiApiKey "KEY"          # Optional: Codex CLI
-pulumi config set --secret netdataClaimToken "TOKEN"   # Optional: Netdata monitoring
+pulumi config set netdataClaimRooms "ROOM_ID"          # Optional: Netdata room ID
+pulumi config set --secret netdataClaimToken "TOKEN"   # Optional: Netdata claim token
 ```
 
 ## Connecting to Your VM
@@ -91,8 +92,8 @@ pulumi config set --secret netdataClaimToken "TOKEN"   # Optional: Netdata monit
 ### 1. Set up Chrome Remote Desktop (one-time)
 
 ```bash
-# SSH into the VM
-gcloud compute ssh posthog-master --zone=europe-west1-b
+# SSH into the VM (uses IAP tunneling - no external IP needed)
+gcloud compute ssh posthog-dev-1 --tunnel-through-iap --zone=europe-west1-b
 
 # Switch to the ph user
 sudo su - ph
@@ -136,7 +137,11 @@ phmake help   # Show all make commands
 
 ## Network Security
 
-Only SSH (port 22) is exposed externally for initial setup. All PostHog services are accessed locally via Chrome Remote Desktop, which uses Google's secure HTTPS relay.
+VMs have no external IP addresses. Access is via:
+- **SSH**: IAP (Identity-Aware Proxy) tunneling - authenticated through your Google identity
+- **Desktop**: Chrome Remote Desktop - uses Google's secure HTTPS relay
+
+Cloud NAT provides outbound internet access for the VMs.
 
 ## Cleanup
 
@@ -153,7 +158,7 @@ pulumi stack rm dev
 ### Startup script logs
 
 ```bash
-gcloud compute ssh posthog-master --zone=europe-west1-b
+gcloud compute ssh posthog-dev-1 --tunnel-through-iap --zone=europe-west1-b
 sudo cat /var/log/posthog-startup.log
 sudo cat /var/log/posthog-startup-timing.log
 ```
@@ -182,6 +187,6 @@ docker compose -f ~/posthog/docker-compose.dev.yml logs -f
 
 **Tip**: Stop VMs when not in use to save costs:
 ```bash
-gcloud compute instances stop posthog-master --zone=europe-west1-b
-gcloud compute instances start posthog-master --zone=europe-west1-b
+gcloud compute instances stop posthog-dev-1 --zone=europe-west1-b
+gcloud compute instances start posthog-dev-1 --zone=europe-west1-b
 ```

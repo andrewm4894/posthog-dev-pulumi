@@ -166,15 +166,15 @@ def load_monitoring_config(config: Config) -> MonitoringConfig:
     yaml_config = _load_yaml_config()
     monitoring = yaml_config.monitoring if yaml_config else {}
 
-    # Netdata claim token is stored as a Pulumi secret (use get() for plain value)
-    # The value is still encrypted in the state file
+    # Netdata settings from Pulumi config (token is a secret)
     netdata_claim_token = config.get("netdataClaimToken") or ""
+    netdata_claim_rooms = config.get("netdataClaimRooms") or ""
 
     return MonitoringConfig(
         ops_agent_enabled=monitoring.get("ops_agent_enabled", True),
         netdata_enabled=monitoring.get("netdata_enabled", False),
         netdata_claim_url=monitoring.get("netdata_claim_url", "https://app.netdata.cloud"),
-        netdata_claim_rooms=monitoring.get("netdata_claim_rooms", ""),
+        netdata_claim_rooms=netdata_claim_rooms,
         netdata_claim_token=netdata_claim_token,
     )
 

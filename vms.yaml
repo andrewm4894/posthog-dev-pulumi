@@ -5,7 +5,6 @@
 defaults:
   machine_type: e2-standard-8
   disk_size_gb: 100
-  zone: europe-west1-b
   posthog_branch: master
   enable_minimal_mode: false
 
@@ -17,8 +16,8 @@ monitoring:
   # Netdata - for real-time monitoring dashboard
   netdata_enabled: true
   netdata_claim_url: https://app.netdata.cloud
-  netdata_claim_rooms: c88fcf94-d115-4628-9ea7-696c647317ac
-  # IMPORTANT: Store the claim token as a Pulumi secret:
+  # IMPORTANT: Set your Netdata room and token via Pulumi config:
+  #   pulumi config set netdataClaimRooms "YOUR_ROOM_ID"
   #   pulumi config set --secret netdataClaimToken "YOUR_TOKEN"
 
 # Claude Code configuration
@@ -46,10 +45,10 @@ codex_cli:
 
 # VM definitions
 # Uncomment and modify to create VMs
-vms:
-  - name: posthog-master
-    description: "PostHog master branch"
-    # posthog_branch: master  # uses default
+# vms:
+  # - name: posthog-master
+  #   description: "PostHog master branch"
+  #   # posthog_branch: master  # uses default
 
   # - name: posthog-feat-llma-bool-evals-with-na
   #   description: "PostHog feature branch - LLM bool evals with NA"

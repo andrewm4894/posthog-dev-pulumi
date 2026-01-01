@@ -1,10 +1,17 @@
 """Network and firewall configuration for PostHog dev VMs.
 
-Note: Only SSH is exposed externally. PostHog services are accessed locally
-via Chrome Remote Desktop (which uses Google's HTTPS relay, no firewall needed).
+VMs have no external IPs for security. Access is via:
+- SSH: IAP (Identity-Aware Proxy) tunneling
+- Desktop: Chrome Remote Desktop (uses Google's HTTPS relay, no firewall needed)
+
+Outbound internet access is provided via Cloud NAT.
 """
 
 from pulumi_gcp import compute
+
+# IAP's IP range for SSH tunneling
+# https://cloud.google.com/iap/docs/using-tcp-forwarding#create-firewall-rule
+IAP_IP_RANGE = "35.235.240.0/20"
 
 
 def create_network(name: str) -> compute.Network:
@@ -16,21 +23,50 @@ def create_network(name: str) -> compute.Network:
     )
 
 
-def create_ssh_firewall(name: str, network: compute.Network) -> compute.Firewall:
-    """Create firewall rule for SSH access.
+def create_cloud_router(name: str, network: compute.Network, region: str) -> compute.Router:
+    """Create a Cloud Router for NAT gateway."""
+    return compute.Router(
+        name,
+        network=network.id,
+        region=region,
+        description="Router for PostHog dev VMs NAT",
+    )
 
-    SSH is always open from 0.0.0.0/0 for OS Login to work properly.
+
+def create_cloud_nat(name: str, router: compute.Router, region: str) -> compute.RouterNat:
+    """Create Cloud NAT for outbound internet access.
+
+    Required since VMs don't have external IPs.
+    """
+    return compute.RouterNat(
+        name,
+        router=router.name,
+        region=region,
+        nat_ip_allocate_option="AUTO_ONLY",
+        source_subnetwork_ip_ranges_to_nat="ALL_SUBNETWORKS_ALL_IP_RANGES",
+        log_config=compute.RouterNatLogConfigArgs(
+            enable=True,
+            filter="ERRORS_ONLY",
+        ),
+    )
+
+
+def create_iap_ssh_firewall(name: str, network: compute.Network) -> compute.Firewall:
+    """Create firewall rule for SSH via IAP tunneling.
+
+    Only allows SSH from Google's IAP IP range, not the public internet.
+    Use: gcloud compute ssh VM_NAME --tunnel-through-iap
     """
     return compute.Firewall(
         name,
         network=network.self_link,
-        description="Allow SSH for OS Login",
+        description="Allow SSH from IAP for secure tunneling",
         allows=[
             compute.FirewallAllowArgs(
                 protocol="tcp",
                 ports=["22"],
             ),
         ],
-        source_ranges=["0.0.0.0/0"],
+        source_ranges=[IAP_IP_RANGE],
         target_tags=["posthog-dev"],
     )

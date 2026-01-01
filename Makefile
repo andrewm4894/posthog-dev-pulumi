@@ -25,25 +25,20 @@ auth: ## Authenticate with GCP (required before first deploy)
 ##@ Stack Management (one stack per VM)
 
 .PHONY: new-vm
-new-vm: ## Create a new VM stack (usage: make new-vm NAME=my-feature BRANCH=feature-branch)
-	@if [ -z "$(NAME)" ]; then \
-		echo "$(YELLOW)Usage: make new-vm NAME=vm-name [BRANCH=branch-name]$(NC)"; \
-		echo "Example: make new-vm NAME=feature-x BRANCH=feature-x-branch"; \
+new-vm: ## Create a new VM stack (usage: make new-vm NAME=my-feature PROJECT=gcp-project [BRANCH=branch])
+	@if [ -z "$(NAME)" ] || [ -z "$(PROJECT)" ]; then \
+		echo "$(YELLOW)Usage: make new-vm NAME=vm-name PROJECT=gcp-project [BRANCH=branch] [REGION=region]$(NC)"; \
+		echo "Example: make new-vm NAME=feature-x PROJECT=my-gcp-project BRANCH=feature-x-branch"; \
 		exit 1; \
 	fi
 	@echo "$(BLUE)Creating new stack '$(NAME)'...$(NC)"
 	pulumi stack init $(NAME)
-	pulumi config set gcp:project andrewm4894
-	pulumi config set gcp:region europe-west1
+	pulumi config set gcp:project $(PROJECT)
+	pulumi config set gcp:region $${REGION:-europe-west1}
 	pulumi config set vmName posthog-$(NAME)
 	pulumi config set vmDescription "PostHog dev VM: $(NAME)"
 	@if [ -n "$(BRANCH)" ]; then \
 		pulumi config set posthogBranch $(BRANCH); \
-	fi
-	@if [ -n "$(IP)" ]; then \
-		pulumi config set allowedIps '["$(IP)/32"]'; \
-	else \
-		echo "$(YELLOW)Tip: Set your IP with: make set-ip IP=your.ip.here$(NC)"; \
 	fi
 	@echo "$(GREEN)Stack '$(NAME)' created! Run 'make up' to deploy.$(NC)"
 
@@ -110,17 +105,6 @@ outputs: ## Show stack outputs (IPs, SSH commands, etc.)
 	@echo "$(BLUE)Stack outputs:$(NC)"
 	pulumi stack output
 
-.PHONY: set-ip
-set-ip: ## Update allowed IPs (usage: make set-ip IP=1.2.3.4)
-	@if [ -z "$(IP)" ]; then \
-		echo "$(YELLOW)Usage: make set-ip IP=YOUR.IP.HERE$(NC)"; \
-		echo "Find your IP at: https://whatismyip.com"; \
-	else \
-		echo "$(BLUE)Setting allowed IP to $(IP)/32...$(NC)"; \
-		pulumi config set allowedIps '["$(IP)/32"]'; \
-		echo "$(GREEN)Done! Run 'make up' to apply changes.$(NC)"; \
-	fi
-
 .PHONY: set-branch
 set-branch: ## Set PostHog branch (usage: make set-branch BRANCH=my-feature)
 	@if [ -z "$(BRANCH)" ]; then \
@@ -134,12 +118,12 @@ set-branch: ## Set PostHog branch (usage: make set-branch BRANCH=my-feature)
 ##@ VM Management
 
 .PHONY: ssh
-ssh: ## SSH into default VM (usage: make ssh or make ssh VM=vm-name)
+ssh: ## SSH into default VM via IAP tunnel (usage: make ssh or make ssh VM=vm-name)
 	@VM_NAME=$${VM:-posthog-dev-1}; \
 	ZONE=$$(pulumi config get gcp:zone 2>/dev/null || echo "europe-west1-b"); \
 	PROJECT=$$(pulumi config get gcp:project); \
-	echo "$(BLUE)SSHing into $$VM_NAME...$(NC)"; \
-	gcloud compute ssh $$VM_NAME --zone=$$ZONE --project=$$PROJECT
+	echo "$(BLUE)SSHing into $$VM_NAME via IAP tunnel...$(NC)"; \
+	gcloud compute ssh $$VM_NAME --tunnel-through-iap --zone=$$ZONE --project=$$PROJECT
 
 .PHONY: start-vm
 start-vm: ## Start a stopped VM (usage: make start-vm VM=vm-name)
@@ -169,7 +153,7 @@ logs: ## View startup script logs (usage: make logs VM=vm-name)
 	ZONE=$$(pulumi config get gcp:zone 2>/dev/null || echo "europe-west1-b"); \
 	PROJECT=$$(pulumi config get gcp:project); \
 	echo "$(BLUE)Fetching logs from $$VM_NAME...$(NC)"; \
-	gcloud compute ssh $$VM_NAME --zone=$$ZONE --project=$$PROJECT --command="sudo cat /var/log/posthog-startup.log"
+	gcloud compute ssh $$VM_NAME --tunnel-through-iap --zone=$$ZONE --project=$$PROJECT --command="sudo cat /var/log/posthog-startup.log"
 
 ##@ Help
 
@@ -183,6 +167,5 @@ help: ## Show this help message
 	@echo "  make install          # Install dependencies"
 	@echo "  make auth             # Authenticate with GCP"
 	@echo "  make up               # Deploy VMs"
-	@echo "  make ssh              # SSH into default VM"
-	@echo "  make set-ip IP=1.2.3.4  # Update allowed IP"
+	@echo "  make ssh              # SSH into VM via IAP tunnel"
 	@echo "  make stop-vm          # Stop VM to save costs"
