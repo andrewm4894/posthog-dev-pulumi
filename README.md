@@ -5,11 +5,11 @@ Pulumi project to provision Google Cloud VMs for PostHog local development.
 ## Features
 
 - **One-command deployment**: Spin up fully configured PostHog dev VMs
+- **Chrome Remote Desktop**: Secure access via Google's remote desktop (no ports exposed)
 - **Branch support**: Deploy from master or any feature branch
 - **Multiple VMs**: Run multiple dev environments simultaneously
-- **IP restriction**: Lock down access to your home/office IP
-- **Pre-configured**: Docker, Python 3.12, Node 20, pnpm, mprocs all installed
-- **Ready to run**: Just SSH in and run `./bin/start`
+- **Pre-configured**: Docker, Flox, Python, Node.js, pnpm, mprocs all installed
+- **AI coding tools**: Claude Code and OpenAI Codex CLI pre-installed
 
 ## Prerequisites
 
@@ -35,116 +35,108 @@ pulumi stack select dev
 pulumi config set gcp:project YOUR_PROJECT_ID
 pulumi config set gcp:region europe-west1
 
-# (Recommended) Restrict access to your IP
-pulumi config set allowedIps '["YOUR.HOME.IP/32"]'
+# Set password for Remote Desktop (used for sudo)
+pulumi config set --secret rdpPassword "YourSecurePassword"
+
+# (Optional) Set API keys for AI coding tools
+pulumi config set --secret anthropicApiKey "sk-ant-..."
+pulumi config set --secret openaiApiKey "sk-..."
 
 # Deploy
 pulumi up
 ```
 
-## Configuration Options
+## Configuration
 
-### Single VM Mode
+### vms.yaml (Recommended)
+
+Edit `vms.yaml` to define your VMs:
+
+```yaml
+defaults:
+  machine_type: e2-standard-8
+  disk_size_gb: 100
+  posthog_branch: master
+
+vms:
+  - name: posthog-master
+    description: "PostHog master branch"
+
+  - name: posthog-feature-x
+    description: "Feature X development"
+    posthog_branch: feature-x-branch
+```
+
+### Pulumi Config (Alternative)
 
 ```bash
-# VM name and description
+# Single VM mode
 pulumi config set vmName my-dev-vm
-pulumi config set vmDescription "My PostHog development VM"
-
-# Branch to checkout (default: master)
 pulumi config set posthogBranch my-feature-branch
-
-# Machine type (default: e2-standard-8)
 pulumi config set machineType e2-standard-4
-
-# Disk size in GB (default: 100)
 pulumi config set diskSizeGb 150
-
-# Enable minimal mode (fewer services, less RAM)
-pulumi config set enableMinimalMode true
-
-# Restrict to your IP (find it at whatismyip.com)
-pulumi config set allowedIps '["1.2.3.4/32"]'
 ```
 
-### Multiple VMs
+### Secrets (via Pulumi only)
 
 ```bash
-pulumi config set vms '[
-  {
-    "name": "dev-vm-1",
-    "description": "Feature branch A",
-    "posthog_branch": "feature-a",
-    "enable_minimal_mode": false
-  },
-  {
-    "name": "dev-vm-2",
-    "description": "Feature branch B",
-    "posthog_branch": "feature-b",
-    "enable_minimal_mode": true
-  }
-]'
+pulumi config set --secret rdpPassword "PASSWORD"      # Required for Chrome Remote Desktop
+pulumi config set --secret anthropicApiKey "KEY"       # Optional: Claude Code
+pulumi config set --secret openaiApiKey "KEY"          # Optional: Codex CLI
+pulumi config set --secret netdataClaimToken "TOKEN"   # Optional: Netdata monitoring
 ```
 
-### Additional Repositories
+## Connecting to Your VM
+
+### 1. Set up Chrome Remote Desktop (one-time)
 
 ```bash
-pulumi config set additionalRepos '[
-  {"url": "https://github.com/posthog/posthog.com", "branch": "master"},
-  {"url": "https://github.com/posthog/plugin-server", "branch": "main"}
-]'
-```
+# SSH into the VM
+gcloud compute ssh posthog-master --zone=europe-west1-b
 
-## SSH Access
-
-Uses GCP OS Login - SSH with your Google account:
-
-```bash
-# Get SSH command from Pulumi outputs
-pulumi stack output posthog-dev-1_ssh_command
-
-# Or directly:
-gcloud compute ssh posthog-dev-1 --zone=europe-west1-b --project=YOUR_PROJECT
-```
-
-## Using the VM
-
-```bash
-# SSH into VM
-gcloud compute ssh posthog-dev-1 --zone=europe-west1-b
-
-# Switch to development user
+# Switch to the ph user
 sudo su - ph
 
-# Start PostHog (full mode)
-./bin/start
-
-# Or start in minimal mode (lighter resource usage)
-./bin/start --minimal
-
-# Convenience aliases available:
-# phstart   - Start PostHog (full mode)
-# phminimal - Start PostHog (minimal mode)
-# phlogs    - View Docker container logs
-# phps      - Show Docker container status
-# phdown    - Stop Docker containers
+# Go to https://remotedesktop.google.com/headless
+# Click "Begin" > "Next" > "Authorize"
+# Copy the Debian Linux command and run it on the VM
+# Set a PIN when prompted
 ```
 
-Access PostHog at `http://<external-ip>:8010`
+### 2. Connect via Chrome Remote Desktop
 
-## Ports Exposed
+1. Go to https://remotedesktop.google.com/access
+2. Click on your VM
+3. Enter your PIN
+4. You're now in the XFCE desktop
 
-| Port  | Service            | Notes                    |
-|-------|-------------------|--------------------------|
-| 22    | SSH               | Always open (OS Login)   |
-| 8010  | PostHog (main)    | Via Caddy proxy          |
-| 8000  | Backend           | Direct access            |
-| 3000  | Frontend          | Vite dev server          |
-| 8123  | ClickHouse        | HTTP interface           |
-| 5555  | Flower            | Celery monitoring        |
-| 16686 | Jaeger            | Tracing (full mode only) |
-| 8081  | Temporal UI       | Workflows (full mode)    |
-| 3030  | Dagster UI        | Pipelines (full mode)    |
+### 3. Start PostHog
+
+Open a terminal in the desktop and run:
+
+```bash
+phstart
+```
+
+This launches mprocs with all PostHog services. Access PostHog at `http://localhost:8010` in the VM's browser.
+
+## Useful Commands
+
+Once connected to the VM as the `ph` user:
+
+```bash
+phstart       # Start PostHog dev server (mprocs)
+phattach      # Attach to running mprocs session
+phtail        # Tail PostHog log files
+phlogs        # View Docker container logs
+phps          # Show Docker container status
+phdown        # Stop Docker containers
+phmake help   # Show all make commands
+```
+
+## Network Security
+
+Only SSH (port 22) is exposed externally for initial setup. All PostHog services are accessed locally via Chrome Remote Desktop, which uses Google's secure HTTPS relay.
 
 ## Cleanup
 
@@ -161,34 +153,35 @@ pulumi stack rm dev
 ### Startup script logs
 
 ```bash
-# SSH into VM and check logs
+gcloud compute ssh posthog-master --zone=europe-west1-b
 sudo cat /var/log/posthog-startup.log
-sudo journalctl -u google-startup-scripts
+sudo cat /var/log/posthog-startup-timing.log
 ```
 
-### Docker not starting
+### Docker issues
 
 ```bash
-sudo systemctl status docker
-sudo systemctl restart docker
+sudo su - ph
+docker compose -f ~/posthog/docker-compose.dev.yml ps
+docker compose -f ~/posthog/docker-compose.dev.yml logs -f
 ```
 
-### PostHog not accessible
+### Chrome Remote Desktop not working
 
-1. Check firewall rules allow your IP: `pulumi stack output allowed_ips`
-2. Verify VM is running: `gcloud compute instances list`
-3. Check if startup script completed: `cat /var/log/posthog-startup.log`
+1. Make sure you ran the setup command from https://remotedesktop.google.com/headless
+2. Check the service: `systemctl --user status chrome-remote-desktop`
+3. Restart it: `systemctl --user restart chrome-remote-desktop`
 
 ## Cost Estimate
 
 | Resource | Cost (24/7) | Notes |
 |----------|-------------|-------|
 | e2-standard-8 VM | ~$200/month | Stop when not in use! |
-| e2-standard-4 VM | ~$100/month | Minimal mode recommended |
+| e2-standard-4 VM | ~$100/month | Lighter workloads |
 | 100GB SSD | ~$17/month | - |
-| Network egress | Variable | Minimal for dev |
 
 **Tip**: Stop VMs when not in use to save costs:
 ```bash
-gcloud compute instances stop posthog-dev-1 --zone=europe-west1-b
+gcloud compute instances stop posthog-master --zone=europe-west1-b
+gcloud compute instances start posthog-master --zone=europe-west1-b
 ```
