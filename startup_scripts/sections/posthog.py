@@ -61,6 +61,9 @@ cat > /home/ph/start-posthog.sh << 'STARTSCRIPTEOF'
 #
 # We set REPOSITORY_ROOT explicitly because bin/start computes it from $0,
 # which doesn't work correctly when invoked through flox activate.
+#
+# Note: mprocs requires a proper TTY to function. When running in a detached
+# screen/tmux session, we use 'script' to allocate a pseudo-terminal.
 
 cd /home/ph/posthog
 
@@ -72,7 +75,10 @@ export DAGSTER_HOME=$REPOSITORY_ROOT/.dagster_home
 export DAGSTER_UI_PORT=${{DAGSTER_UI_PORT:-3030}}
 export DAGSTER_UI_HOST=${{DAGSTER_UI_HOST:-localhost}}
 
-FLOX_NO_DIRENV_SETUP=1 exec flox activate -- bin/start --custom bin/mprocs-with-logging.yaml
+# Use 'script' to allocate a pseudo-terminal for mprocs TUI
+# The -q flag suppresses the "Script started" message
+# /dev/null discards the typescript output file
+FLOX_NO_DIRENV_SETUP=1 exec script -q -c 'flox activate -- bin/start --custom bin/mprocs-with-logging.yaml' /dev/null
 STARTSCRIPTEOF
 
 chmod +x /home/ph/start-posthog.sh
@@ -145,16 +151,30 @@ def get_start_script() -> str:
     return '''
 section_start "Start PostHog"
 
-# Wait a bit for migrations to settle
-sleep 10
+# Note: mprocs requires an interactive terminal (TTY) to function properly.
+# Instead of auto-starting in a detached session (which fails), we leave
+# the environment ready for the user to start PostHog interactively.
+#
+# To start PostHog after connecting:
+#   1. SSH: gcloud compute ssh <vm> && sudo su - ph && phstart
+#   2. RDP: Open terminal and run: phstart
+#
+# The phstart alias runs: /home/ph/start-posthog.sh
 
-# Start PostHog in a detached screen session using the start script
-# The start script:
-# - Sets JS_URL/JS_POSTHOG_UI_HOST to external IP for browser access
-# - Sources the Python venv (flox profile scripts only run for interactive shells)
-# - Runs mprocs via flox activate
-su - ph -c "screen -dmS ph /home/ph/start-posthog.sh"
-
-echo "PostHog started in screen session 'ph' - attach with: screen -r ph"
+echo ""
+echo "=========================================="
+echo "PostHog environment is ready!"
+echo "=========================================="
+echo ""
+echo "Docker services are running."
+echo "Database migrations have been applied."
+echo "Demo data has been generated."
+echo ""
+echo "To start the PostHog dev server:"
+echo "  1. Connect via SSH or Remote Desktop"
+echo "  2. Run: phstart (or /home/ph/start-posthog.sh)"
+echo ""
+echo "This will launch mprocs with all PostHog services."
+echo ""
 section_end "Start PostHog"
 '''
