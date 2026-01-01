@@ -42,10 +42,10 @@ def main():
 
     # Create Cloud Router and NAT for outbound internet (VMs have no external IPs)
     router = create_cloud_router("posthog-dev-router", network, region)
-    nat = create_cloud_nat("posthog-dev-nat", router, region)
+    create_cloud_nat("posthog-dev-nat", router, region)
 
     # Create IAP SSH firewall rule (allows SSH only via IAP tunneling, not public internet)
-    ssh_firewall = create_iap_ssh_firewall("posthog-dev-iap-ssh", network)
+    create_iap_ssh_firewall("posthog-dev-iap-ssh", network)
 
     # Create VMs based on configuration
     for vm_config in vm_configs:
