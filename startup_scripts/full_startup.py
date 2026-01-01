@@ -451,6 +451,9 @@ su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml ps d
 echo ">>> Running database migrations"
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate" || true
 
+echo ">>> Generating demo data"
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- python manage.py generate_demo_data" || true
+
 # ========================================
 # 8c. Create Makefile for Common Commands
 # ========================================
