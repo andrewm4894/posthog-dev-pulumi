@@ -29,6 +29,3 @@ POSTHOG_ENV_DEFAULTS = {
     "REDIS_URL": "redis://localhost:6379/",
     "CLICKHOUSE_HOST": "localhost",
 }
-
-# Default mprocs config for file-based logging (useful for code agents)
-DEFAULT_MPROCS_CONFIG = "bin/mprocs-with-logging.yaml"
