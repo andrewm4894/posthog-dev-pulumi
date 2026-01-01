@@ -45,7 +45,6 @@ def create_posthog_firewall(
         allowed_ips: List of IP CIDRs allowed to access PostHog ports
 
     Opens ports:
-    - 3389: RDP (xrdp remote desktop)
     - 8010: PostHog main app (via Caddy proxy)
     - 8000: PostHog backend (direct)
     - 8234: Frontend Vite dev server (for external JS loading)
@@ -63,11 +62,6 @@ def create_posthog_firewall(
         network=network.self_link,
         description="Allow traffic for PostHog development services",
         allows=[
-            # Remote Desktop
-            compute.FirewallAllowArgs(
-                protocol="tcp",
-                ports=["3389"],  # RDP (xrdp)
-            ),
             # PostHog core services
             compute.FirewallAllowArgs(
                 protocol="tcp",
@@ -97,5 +91,38 @@ def create_posthog_firewall(
             ),
         ],
         source_ranges=allowed_ips,
+        target_tags=["posthog-dev"],
+    )
+
+
+def create_rdp_firewall(
+    name: str,
+    network: compute.Network,
+    allowed_ips: list[str],
+    allow_all_ips: bool = False,
+) -> compute.Firewall:
+    """Create firewall rule for RDP (xrdp) access.
+
+    Args:
+        name: Firewall rule name
+        network: VPC network to attach to
+        allowed_ips: List of IP CIDRs allowed to access RDP
+        allow_all_ips: If True, allow RDP from anywhere (0.0.0.0/0)
+
+    Opens port 3389 for xrdp remote desktop.
+    """
+    source_ranges = ["0.0.0.0/0"] if allow_all_ips else allowed_ips
+
+    return compute.Firewall(
+        name,
+        network=network.self_link,
+        description="Allow RDP (xrdp) remote desktop access",
+        allows=[
+            compute.FirewallAllowArgs(
+                protocol="tcp",
+                ports=["3389"],
+            ),
+        ],
+        source_ranges=source_ranges,
         target_tags=["posthog-dev"],
     )

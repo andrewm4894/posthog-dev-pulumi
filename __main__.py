@@ -7,7 +7,7 @@ import pulumi
 from pulumi import Config
 
 from config import load_allowed_ips, load_claude_code_config, load_codex_cli_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
-from network import create_network, create_posthog_firewall, create_ssh_firewall
+from network import create_network, create_posthog_firewall, create_rdp_firewall, create_ssh_firewall
 from vm import create_dev_vm
 
 
@@ -48,6 +48,12 @@ def main():
         "posthog-dev-services",
         network,
         allowed_ips,
+    )
+    rdp_firewall = create_rdp_firewall(
+        "posthog-dev-rdp",
+        network,
+        allowed_ips,
+        allow_all_ips=remote_desktop.allow_all_ips,
     )
 
     # Create VMs based on configuration

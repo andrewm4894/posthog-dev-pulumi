@@ -63,6 +63,7 @@ class RemoteDesktopConfig:
 
     enabled: bool = True
     password: str = ""  # Loaded from Pulumi secret
+    allow_all_ips: bool = False  # If True, RDP is open to 0.0.0.0/0
 
 
 @dataclass
@@ -235,6 +236,7 @@ def load_remote_desktop_config(config: Config) -> RemoteDesktopConfig:
     return RemoteDesktopConfig(
         enabled=remote_desktop.get("enabled", True),
         password=password,
+        allow_all_ips=remote_desktop.get("allow_all_ips", False),
     )
 
 

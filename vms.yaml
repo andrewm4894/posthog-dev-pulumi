@@ -39,6 +39,9 @@ claude_code:
 remote_desktop:
   # Enable XFCE desktop + xrdp for RDP access
   enabled: true
+  # Allow RDP access from any IP (0.0.0.0/0) instead of just allowed_ips
+  # WARNING: Only enable if you have a strong password set!
+  allow_all_ips: true
   # IMPORTANT: Store the password as a Pulumi secret:
   #   pulumi config set --secret rdpPassword "YourSecurePassword123"
   # Connect with any RDP client to <external-ip>:3389
