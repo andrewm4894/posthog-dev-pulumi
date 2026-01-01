@@ -189,7 +189,6 @@ else
 fi
 
 # Configure Chrome Remote Desktop to use XFCE
-mkdir -p /home/ph/.chrome-remote-desktop-session
 echo "exec /usr/bin/xfce4-session" > /home/ph/.chrome-remote-desktop-session
 chmod +x /home/ph/.chrome-remote-desktop-session
 chown ph:ph /home/ph/.chrome-remote-desktop-session
