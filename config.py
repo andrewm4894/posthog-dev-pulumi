@@ -59,11 +59,10 @@ class ClaudeCodeConfig:
 
 @dataclass
 class RemoteDesktopConfig:
-    """Configuration for Remote Desktop (xrdp) access."""
+    """Configuration for Chrome Remote Desktop access."""
 
     enabled: bool = True
-    password: str = ""  # Loaded from Pulumi secret
-    allow_all_ips: bool = False  # If True, RDP is open to 0.0.0.0/0
+    password: str = ""  # Loaded from Pulumi secret (used for sudo in desktop session)
 
 
 @dataclass
@@ -158,29 +157,6 @@ def load_vm_configs(config: Config) -> list[VMConfig]:
     ]
 
 
-def load_allowed_ips(config: Config) -> list[str]:
-    """Load allowed IP CIDRs from Pulumi config only.
-
-    NOTE: IPs should NOT be stored in vms.yaml (it's in git).
-    Use: pulumi config set allowedIps '["YOUR.IP/32"]'
-
-    Returns:
-        List of IP CIDR strings (e.g., ["1.2.3.4/32"])
-
-    Raises:
-        ValueError: If no allowed IPs are configured (security requirement)
-    """
-    ips_json = config.get("allowedIps")
-    if ips_json:
-        return json.loads(ips_json)
-
-    raise ValueError(
-        "No allowed IPs configured! This is required for security.\n"
-        "Run: pulumi config set allowedIps '[\"YOUR.IP.HERE/32\"]'\n"
-        "Find your IP at: https://whatismyip.com"
-    )
-
-
 def load_monitoring_config(config: Config) -> MonitoringConfig:
     """Load monitoring configuration from vms.yaml and Pulumi secrets.
 
@@ -222,21 +198,20 @@ def load_claude_code_config(config: Config) -> ClaudeCodeConfig:
 
 
 def load_remote_desktop_config(config: Config) -> RemoteDesktopConfig:
-    """Load Remote Desktop (xrdp) configuration from vms.yaml and Pulumi secrets.
+    """Load Chrome Remote Desktop configuration from vms.yaml and Pulumi secrets.
 
     Returns:
-        RemoteDesktopConfig with xrdp settings
+        RemoteDesktopConfig with Chrome Remote Desktop settings
     """
     yaml_config = _load_yaml_config()
     remote_desktop = yaml_config.remote_desktop if yaml_config else {}
 
-    # Password is stored as a Pulumi secret
+    # Password is stored as a Pulumi secret (used for sudo in desktop session)
     password = config.get("rdpPassword") or ""
 
     return RemoteDesktopConfig(
         enabled=remote_desktop.get("enabled", True),
         password=password,
-        allow_all_ips=remote_desktop.get("allow_all_ips", False),
     )
 
 

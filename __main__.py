@@ -1,13 +1,14 @@
 """PostHog Development VM Pulumi Program.
 
 Provisions GCP VMs pre-configured for PostHog local development.
+Access is via Chrome Remote Desktop (no external ports needed for PostHog).
 """
 
 import pulumi
 from pulumi import Config
 
-from config import load_allowed_ips, load_claude_code_config, load_codex_cli_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
-from network import create_network, create_posthog_firewall, create_rdp_firewall, create_ssh_firewall
+from config import load_claude_code_config, load_codex_cli_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
+from network import create_network, create_ssh_firewall
 from vm import create_dev_vm
 
 
@@ -24,9 +25,6 @@ def main():
     # Load VM configurations from Pulumi config
     vm_configs = load_vm_configs(config)
 
-    # Load allowed IPs for firewall
-    allowed_ips = load_allowed_ips(config)
-
     # Load monitoring configuration
     monitoring = load_monitoring_config(config)
 
@@ -42,19 +40,8 @@ def main():
     # Create shared network resources
     network = create_network("posthog-dev-network")
 
-    # Create firewall rules
+    # Create SSH firewall rule (only port needed - Chrome Remote Desktop uses Google's relay)
     ssh_firewall = create_ssh_firewall("posthog-dev-ssh", network)
-    posthog_firewall = create_posthog_firewall(
-        "posthog-dev-services",
-        network,
-        allowed_ips,
-    )
-    rdp_firewall = create_rdp_firewall(
-        "posthog-dev-rdp",
-        network,
-        allowed_ips,
-        allow_all_ips=remote_desktop.allow_all_ips,
-    )
 
     # Create VMs based on configuration
     for vm_config in vm_configs:
@@ -88,18 +75,9 @@ def main():
                 project,
             ),
         )
-        pulumi.export(
-            f"{vm_config.name}_posthog_url",
-            pulumi.Output.concat(
-                "http://",
-                vm.network_interfaces[0].access_configs[0].nat_ip,
-                ":8010",
-            ),
-        )
 
     # Export network info
     pulumi.export("network_name", network.name)
-    pulumi.export("allowed_ips", allowed_ips)
 
 
 main()

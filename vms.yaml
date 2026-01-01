@@ -9,13 +9,6 @@ defaults:
   posthog_branch: master
   enable_minimal_mode: false
 
-# Your allowed IPs - SET VIA PULUMI CONFIG, NOT HERE!
-# Run: pulumi config set allowedIps '["YOUR.IP.HERE/32"]'
-# These IPs can access PostHog ports (8010, 8000, 3000, etc.)
-# SSH is always open via GCP OS Login
-# allowed_ips:
-#   - YOUR.IP.HERE/32
-
 # Monitoring configuration
 monitoring:
   # GCP Ops Agent - for Cloud Monitoring/Logging integration
@@ -35,17 +28,14 @@ claude_code:
   # IMPORTANT: Store the API key as a Pulumi secret:
   #   pulumi config set --secret anthropicApiKey "YOUR_API_KEY"
 
-# Remote Desktop (xrdp) configuration
+# Chrome Remote Desktop configuration
 remote_desktop:
-  # Enable XFCE desktop + xrdp for RDP access
+  # Enable XFCE desktop + Chrome Remote Desktop
   enabled: true
-  # Allow RDP access from any IP (0.0.0.0/0) instead of just allowed_ips
-  # WARNING: Only enable if you have a strong password set!
-  allow_all_ips: true
-  # IMPORTANT: Store the password as a Pulumi secret:
+  # IMPORTANT: Store the password as a Pulumi secret (for sudo in desktop session):
   #   pulumi config set --secret rdpPassword "YourSecurePassword123"
-  # Connect with any RDP client to <external-ip>:3389
-  # Username: ph
+  # Setup: SSH to VM, run the command from https://remotedesktop.google.com/headless
+  # Then connect via: https://remotedesktop.google.com/access
 
 # OpenAI Codex CLI configuration
 codex_cli:

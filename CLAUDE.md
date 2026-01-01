@@ -46,10 +46,9 @@ VMs can be configured in two ways:
 
 Secrets must be stored via Pulumi (not in vms.yaml):
 ```bash
-pulumi config set allowedIps '["YOUR.IP/32"]'
 pulumi config set --secret netdataClaimToken "TOKEN"
 pulumi config set --secret anthropicApiKey "KEY"
-pulumi config set --secret rdpPassword "PASSWORD"
+pulumi config set --secret rdpPassword "PASSWORD"  # For sudo in Chrome Remote Desktop session
 ```
 
 ## Architecture
@@ -58,7 +57,7 @@ pulumi config set --secret rdpPassword "PASSWORD"
 __main__.py          # Entry point - orchestrates VM creation
 config.py            # Configuration loading from vms.yaml and Pulumi config
                      # Dataclasses: VMConfig, MonitoringConfig, ClaudeCodeConfig, RemoteDesktopConfig
-network.py           # VPC network and firewall rules (SSH, PostHog services)
+network.py           # VPC network and SSH firewall (only port 22 exposed)
 vm.py                # GCP compute instance creation
 constants.py         # Version pins (Flox), Docker config, sysctl settings
 startup_scripts/
@@ -71,7 +70,7 @@ vms.yaml             # VM definitions and default settings (not for secrets)
 ## Key Patterns
 
 - Configuration priority: vms.yaml > Pulumi config JSON arrays > Pulumi config individual keys
-- `allowed_ips` is required and must be set via Pulumi config (security requirement)
-- Startup scripts install: GCP Ops Agent, Netdata, Docker, Flox, Claude Code, xrdp + XFCE
+- Only SSH (port 22) is exposed externally; PostHog is accessed locally via Chrome Remote Desktop
+- Startup scripts install: GCP Ops Agent, Netdata, Docker, Flox, Claude Code, Chrome Remote Desktop + XFCE
 - VMs use Flox for dependency management (PostHog's recommended approach)
-- Firewall rules are attached via the `posthog-dev` network tag
+- Network tag `posthog-dev` is used for firewall rules
