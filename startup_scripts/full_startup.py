@@ -101,15 +101,15 @@ echo ">>> Claude Code binary installed (user config will be done after user crea
 '''
         claude_code_user_config = f'''
 # ========================================
-# 3b. Configure Claude Code for posthog-dev user
+# 3b. Configure Claude Code for ph user
 # ========================================
-echo ">>> Configuring Claude Code for posthog-dev user"
+echo ">>> Configuring Claude Code for ph user"
 
-# Create Claude Code configuration directory for posthog-dev user
-mkdir -p /home/posthog-dev/.claude
+# Create Claude Code configuration directory for ph user
+mkdir -p /home/ph/.claude
 
 # Create settings.json with API key and permissions for headless use
-cat > /home/posthog-dev/.claude/settings.json << 'CLAUDEEOF'
+cat > /home/ph/.claude/settings.json << 'CLAUDEEOF'
 {{
   "permissions": {{
     "allow": ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch"]
@@ -118,7 +118,7 @@ cat > /home/posthog-dev/.claude/settings.json << 'CLAUDEEOF'
 CLAUDEEOF
 
 # Set environment variable for API key in user's profile
-cat >> /home/posthog-dev/.bashrc << 'CLAUDEENVEOF'
+cat >> /home/ph/.bashrc << 'CLAUDEENVEOF'
 
 # Claude Code configuration
 export ANTHROPIC_API_KEY="{claude_code.api_key}"
@@ -126,8 +126,8 @@ export PATH="$HOME/.local/bin:$PATH"
 alias claude='~/.local/bin/claude'
 CLAUDEENVEOF
 
-chown -R posthog-dev:posthog-dev /home/posthog-dev/.claude
-echo ">>> Claude Code configured for posthog-dev user"
+chown -R ph:ph /home/ph/.claude
+echo ">>> Claude Code configured for ph user"
 '''
 
     # Build Remote Desktop (xrdp + XFCE + Chrome) installation
@@ -170,35 +170,35 @@ echo ">>> Remote Desktop packages installed (user config will be done after user
 '''
         remote_desktop_user_config = f'''
 # ========================================
-# 3c. Configure Remote Desktop for posthog-dev user
+# 3c. Configure Remote Desktop for ph user
 # ========================================
-echo ">>> Configuring Remote Desktop for posthog-dev user"
+echo ">>> Configuring Remote Desktop for ph user"
 
-# Add posthog-dev to chrome-remote-desktop group (if it exists)
+# Add ph to chrome-remote-desktop group (if it exists)
 if getent group chrome-remote-desktop > /dev/null 2>&1; then
-    usermod -aG chrome-remote-desktop posthog-dev
-    echo ">>> Added posthog-dev to chrome-remote-desktop group"
+    usermod -aG chrome-remote-desktop ph
+    echo ">>> Added ph to chrome-remote-desktop group"
 else
     echo ">>> Warning: chrome-remote-desktop group not found, creating it"
     groupadd chrome-remote-desktop
-    usermod -aG chrome-remote-desktop posthog-dev
+    usermod -aG chrome-remote-desktop ph
 fi
 
 # Configure Chrome Remote Desktop to use XFCE
-mkdir -p /home/posthog-dev/.chrome-remote-desktop-session
-echo "exec /usr/bin/xfce4-session" > /home/posthog-dev/.chrome-remote-desktop-session
-chmod +x /home/posthog-dev/.chrome-remote-desktop-session
-chown posthog-dev:posthog-dev /home/posthog-dev/.chrome-remote-desktop-session
+mkdir -p /home/ph/.chrome-remote-desktop-session
+echo "exec /usr/bin/xfce4-session" > /home/ph/.chrome-remote-desktop-session
+chmod +x /home/ph/.chrome-remote-desktop-session
+chown ph:ph /home/ph/.chrome-remote-desktop-session
 
 # Configure XFCE as the session for xrdp
-echo "xfce4-session" > /home/posthog-dev/.xsession
-chown posthog-dev:posthog-dev /home/posthog-dev/.xsession
+echo "xfce4-session" > /home/ph/.xsession
+chown ph:ph /home/ph/.xsession
 
-# Set password for posthog-dev user (for RDP login)
-echo "posthog-dev:{remote_desktop.password}" | chpasswd
+# Set password for ph user (for RDP login)
+echo "ph:{remote_desktop.password}" | chpasswd
 
 echo ">>> Remote Desktop configured - connect via RDP to port 3389"
-echo ">>> Username: posthog-dev"
+echo ">>> Username: ph"
 '''
 
     # Build the additional repos clone commands
@@ -206,8 +206,8 @@ echo ">>> Username: posthog-dev"
     for repo in additional_repos:
         additional_clone_commands += f'''
 echo ">>> Cloning {repo.url} (branch: {repo.branch})"
-git clone --branch {repo.branch} {repo.url} /home/posthog-dev/{repo.target_dir}
-chown -R posthog-dev:posthog-dev /home/posthog-dev/{repo.target_dir}
+git clone --branch {repo.branch} {repo.url} /home/ph/{repo.target_dir}
+chown -R ph:ph /home/ph/{repo.target_dir}
 '''
 
     minimal_env = 'export POSTHOG_MINIMAL_MODE="true"' if enable_minimal_mode else ""
@@ -285,11 +285,11 @@ systemctl restart docker
 # ========================================
 # 3. Create Development User
 # ========================================
-echo ">>> Creating posthog-dev user"
-if ! id posthog-dev &>/dev/null; then
-    useradd -m -s /bin/bash posthog-dev
+echo ">>> Creating ph user"
+if ! id ph &>/dev/null; then
+    useradd -m -s /bin/bash ph
 fi
-usermod -aG docker posthog-dev
+usermod -aG docker ph
 
 {claude_code_user_config}
 {remote_desktop_user_config}
@@ -325,12 +325,12 @@ flox --version
 
 # Configure Flox to disable direnv prompts (enables headless/non-interactive activation)
 echo ">>> Configuring Flox for headless operation"
-mkdir -p /home/posthog-dev/.config/flox
-cat > /home/posthog-dev/.config/flox/flox.toml << 'FLOXCONFIGEOF'
+mkdir -p /home/ph/.config/flox
+cat > /home/ph/.config/flox/flox.toml << 'FLOXCONFIGEOF'
 [features]
 direnv = false
 FLOXCONFIGEOF
-chown -R posthog-dev:posthog-dev /home/posthog-dev/.config
+chown -R ph:ph /home/ph/.config
 
 # ========================================
 # 6. Clone Repositories
@@ -340,16 +340,16 @@ echo ">>> Cloning PostHog repository (branch: {posthog_branch})"
 # Check if branch exists remotely
 if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
     echo ">>> Branch '{posthog_branch}' exists, cloning directly"
-    git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/posthog-dev/posthog
+    git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/ph/posthog
 else
     echo ">>> Branch '{posthog_branch}' does not exist, cloning master and creating new branch"
-    git clone https://github.com/posthog/posthog.git /home/posthog-dev/posthog
-    cd /home/posthog-dev/posthog
+    git clone https://github.com/posthog/posthog.git /home/ph/posthog
+    cd /home/ph/posthog
     git checkout -b {posthog_branch}
     cd /
 fi
 
-chown -R posthog-dev:posthog-dev /home/posthog-dev/posthog
+chown -R ph:ph /home/ph/posthog
 
 {additional_clone_commands}
 
@@ -359,24 +359,24 @@ chown -R posthog-dev:posthog-dev /home/posthog-dev/posthog
 echo ">>> Setting up PostHog environment"
 
 # Create environment file
-cat > /home/posthog-dev/posthog/.env << 'ENVEOF'
+cat > /home/ph/posthog/.env << 'ENVEOF'
 {env_lines}
 ENVEOF
 
-chown posthog-dev:posthog-dev /home/posthog-dev/posthog/.env
+chown ph:ph /home/ph/posthog/.env
 
 # Create simple PostHog start script (localhost access via Remote Desktop)
-cat > /home/posthog-dev/start-posthog.sh << 'STARTSCRIPTEOF'
+cat > /home/ph/start-posthog.sh << 'STARTSCRIPTEOF'
 #!/bin/bash
 # Simple PostHog start script (localhost access via RDP)
 # Generated by posthog-dev-pulumi startup script
-cd /home/posthog-dev/posthog
+cd /home/ph/posthog
 FLOX_NO_DIRENV_SETUP=1 exec flox activate -- mprocs --config bin/mprocs-with-logging.yaml
 STARTSCRIPTEOF
 
-chmod +x /home/posthog-dev/start-posthog.sh
-chown posthog-dev:posthog-dev /home/posthog-dev/start-posthog.sh
-echo ">>> Created /home/posthog-dev/start-posthog.sh"
+chmod +x /home/ph/start-posthog.sh
+chown ph:ph /home/ph/start-posthog.sh
+echo ">>> Created /home/ph/start-posthog.sh"
 
 # ========================================
 # 8. Configure /etc/hosts for PostHog services
@@ -402,35 +402,35 @@ echo ">>> This may take several minutes on first run..."
 # - Node.js dependencies (pnpm install)
 # Note: /etc/hosts already configured above (Flox can't sudo in non-interactive mode)
 # FLOX_NO_DIRENV_SETUP=1 prevents interactive direnv setup prompt
-su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 'Flox environment activated'" || true
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 'Flox environment activated'" || true
 
 # Download GeoLite2 database
 echo ">>> Downloading GeoLite2 database"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
 
 # ========================================
 # 8b. Start Docker Services & Run Migrations
 # ========================================
 echo ">>> Starting Docker services"
 # Use || true to continue even if some containers fail (e.g., port conflicts with otel-collector)
-su - posthog-dev -c "cd /home/posthog-dev/posthog && docker compose -f docker-compose.dev.yml up -d" || true
+su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml up -d" || true
 
 echo ">>> Waiting for Docker services to be ready..."
 sleep 30
 
 # Ensure critical services are running (db, redis, clickhouse, kafka)
 echo ">>> Verifying critical services..."
-su - posthog-dev -c "cd /home/posthog-dev/posthog && docker compose -f docker-compose.dev.yml ps db redis clickhouse kafka"
+su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml ps db redis clickhouse kafka"
 
 echo ">>> Running database migrations"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate" || true
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate" || true
 
 # ========================================
 # 8c. Create Makefile for Common Commands
 # ========================================
 echo ">>> Creating Makefile"
 
-cat > /home/posthog-dev/posthog/Makefile.dev << 'MAKEFILEEOF'
+cat > /home/ph/posthog/Makefile.dev << 'MAKEFILEEOF'
 # PostHog Development VM - Handy Commands
 # Usage: make -f Makefile.dev <target>
 
@@ -500,7 +500,7 @@ help:
 	@echo ""
 MAKEFILEEOF
 
-chown posthog-dev:posthog-dev /home/posthog-dev/posthog/Makefile.dev
+chown ph:ph /home/ph/posthog/Makefile.dev
 
 # ========================================
 # 8d. Start PostHog in Screen Session
@@ -515,7 +515,7 @@ sleep 10
 # - Sets JS_URL/JS_POSTHOG_UI_HOST to external IP for browser access
 # - Sources the Python venv (flox profile scripts only run for interactive shells)
 # - Runs mprocs via flox activate
-su - posthog-dev -c "screen -dmS posthog /home/posthog-dev/start-posthog.sh"
+su - ph -c "screen -dmS posthog /home/ph/start-posthog.sh"
 
 echo ">>> PostHog started in screen session 'posthog'"
 echo ">>> Attach with: screen -r posthog"
@@ -525,7 +525,7 @@ echo ">>> Attach with: screen -r posthog"
 # ========================================
 echo ">>> Configuring shell environment"
 
-cat >> /home/posthog-dev/.bashrc << 'BASHRCEOF'
+cat >> /home/ph/.bashrc << 'BASHRCEOF'
 
 # PostHog Development Environment (Flox-based)
 export POSTHOG_DIR="$HOME/posthog"
@@ -578,7 +578,7 @@ echo "PostHog directory: $POSTHOG_DIR"
 echo ""
 BASHRCEOF
 
-chown posthog-dev:posthog-dev /home/posthog-dev/.bashrc
+chown ph:ph /home/ph/.bashrc
 
 # ========================================
 # 10. Final Setup
@@ -594,7 +594,7 @@ sysctl -p
 
 # Pre-pull Docker images to speed up first start
 echo ">>> Pre-pulling Docker images (this may take a while)"
-su - posthog-dev -c "cd /home/posthog-dev/posthog && docker compose -f docker-compose.dev-minimal.yml pull" || true
+su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev-minimal.yml pull" || true
 
 echo "========================================"
 echo "PostHog Dev VM Startup Complete - $(date)"
@@ -606,7 +606,7 @@ echo "ACCESS OPTIONS:"
 echo ""
 echo "  Chrome Remote Desktop (one-time setup required):"
 echo "    1. SSH to VM: gcloud compute ssh <vm-name> --zone=europe-west1-b"
-echo "    2. Switch user: sudo su - posthog-dev"
+echo "    2. Switch user: sudo su - ph"
 echo "    3. Go to: https://remotedesktop.google.com/headless"
 echo "    4. Click 'Begin' > 'Next' > 'Authorize'"
 echo "    5. Copy the Debian Linux command and run it on the VM"
@@ -615,11 +615,11 @@ echo "    7. Then connect via: https://remotedesktop.google.com/access"
 echo ""
 echo "  xrdp (alternative - no setup needed):"
 echo "    Connect to <external-ip>:3389 with any RDP client"
-echo "    Username: posthog-dev"
+echo "    Username: ph"
 echo ""
 echo "  SSH:"
 echo "    gcloud compute ssh <vm-name> --zone=europe-west1-b"
-echo "    sudo su - posthog-dev"
+echo "    sudo su - ph"
 echo "    phattach  (attach to mprocs)"
 echo ""
 echo "Detach from screen: Ctrl+A, D"

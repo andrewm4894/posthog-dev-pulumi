@@ -42,7 +42,7 @@ remote_desktop:
   # IMPORTANT: Store the password as a Pulumi secret:
   #   pulumi config set --secret rdpPassword "YourSecurePassword123"
   # Connect with any RDP client to <external-ip>:3389
-  # Username: posthog-dev
+  # Username: ph
 
 # VM definitions
 # Uncomment and modify to create VMs

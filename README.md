@@ -114,7 +114,7 @@ gcloud compute ssh posthog-dev-1 --zone=europe-west1-b --project=YOUR_PROJECT
 gcloud compute ssh posthog-dev-1 --zone=europe-west1-b
 
 # Switch to development user
-sudo su - posthog-dev
+sudo su - ph
 
 # Start PostHog (full mode)
 ./bin/start
