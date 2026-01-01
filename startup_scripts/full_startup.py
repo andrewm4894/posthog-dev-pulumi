@@ -475,7 +475,7 @@ start-minimal:
 
 # Attach to running PostHog screen session
 attach:
-	screen -r posthog
+	screen -r ph
 
 # View Docker logs
 logs:
@@ -544,10 +544,10 @@ sleep 10
 # - Sets JS_URL/JS_POSTHOG_UI_HOST to external IP for browser access
 # - Sources the Python venv (flox profile scripts only run for interactive shells)
 # - Runs mprocs via flox activate
-su - ph -c "screen -dmS posthog /home/ph/start-posthog.sh"
+su - ph -c "screen -dmS ph /home/ph/start-posthog.sh"
 
-echo ">>> PostHog started in screen session 'posthog'"
-echo ">>> Attach with: screen -r posthog"
+echo ">>> PostHog started in screen session 'ph'"
+echo ">>> Attach with: screen -r ph"
 
 # ========================================
 # 9. Setup Shell Environment
@@ -572,7 +572,7 @@ cd() {{
 
 # Convenience aliases
 alias ph='cd $POSTHOG_DIR'
-alias phattach='screen -r posthog'
+alias phattach='screen -r ph'
 alias phstart='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --custom bin/mprocs-with-logging.yaml'
 alias phminimal='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --minimal'
 alias phlogs='docker compose -f $POSTHOG_DIR/docker-compose.dev.yml logs -f'
