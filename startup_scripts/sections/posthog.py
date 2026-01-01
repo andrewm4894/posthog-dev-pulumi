@@ -73,8 +73,8 @@ cd /home/ph/posthog
 export REPOSITORY_ROOT=/home/ph/posthog
 export LOCK_FILE="$REPOSITORY_ROOT/bin/start.lock"
 export DAGSTER_HOME=$REPOSITORY_ROOT/.dagster_home
-export DAGSTER_UI_PORT=${DAGSTER_UI_PORT:-3030}
-export DAGSTER_UI_HOST=${DAGSTER_UI_HOST:-localhost}
+export DAGSTER_UI_PORT=${{DAGSTER_UI_PORT:-3030}}
+export DAGSTER_UI_HOST=${{DAGSTER_UI_HOST:-localhost}}
 
 FLOX_NO_DIRENV_SETUP=1 exec flox activate -- bin/start --custom bin/mprocs-with-logging.yaml
 STARTSCRIPTEOF
