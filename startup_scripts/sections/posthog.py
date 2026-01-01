@@ -15,17 +15,14 @@ chown -R ph:ph /home/ph/{repo.target_dir}
 '''
 
     return f'''
-# ========================================
-# 6. Clone Repositories
-# ========================================
-echo ">>> Cloning PostHog repository (branch: {posthog_branch})"
+section_start "Clone Repositories"
 
 # Check if branch exists remotely
 if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
-    echo ">>> Branch '{posthog_branch}' exists, cloning directly"
+    echo "Branch '{posthog_branch}' exists, cloning directly"
     git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/ph/posthog
 else
-    echo ">>> Branch '{posthog_branch}' does not exist, cloning master and creating new branch"
+    echo "Branch '{posthog_branch}' does not exist, cloning master and creating new branch"
     git clone https://github.com/posthog/posthog.git /home/ph/posthog
     cd /home/ph/posthog
     git checkout -b {posthog_branch}
@@ -34,7 +31,9 @@ fi
 
 chown -R ph:ph /home/ph/posthog
 
-{additional_clone_commands}'''
+{additional_clone_commands}
+section_end "Clone Repositories"
+'''
 
 
 def get_posthog_env(enable_minimal_mode: bool) -> str:
@@ -44,10 +43,7 @@ def get_posthog_env(enable_minimal_mode: bool) -> str:
         env_lines += "\nPOSTHOG_MINIMAL_MODE=true"
 
     return f'''
-# ========================================
-# 7. Setup PostHog Environment
-# ========================================
-echo ">>> Setting up PostHog environment"
+section_start "PostHog Environment"
 
 # Create environment file
 cat > /home/ph/posthog/.env << 'ENVEOF'
@@ -81,35 +77,30 @@ STARTSCRIPTEOF
 
 chmod +x /home/ph/start-posthog.sh
 chown ph:ph /home/ph/start-posthog.sh
-echo ">>> Created /home/ph/start-posthog.sh"
+section_end "PostHog Environment"
 '''
 
 
 def get_hosts_config() -> str:
     """Generate /etc/hosts configuration section."""
     return '''
-# ========================================
-# 8. Configure /etc/hosts for PostHog services
-# ========================================
-echo ">>> Configuring /etc/hosts for PostHog services"
+section_start "Hosts Config"
 # Add required entries to /etc/hosts if not present (needed for Docker service resolution)
 if ! grep -q "kafka clickhouse clickhouse-coordinator objectstorage" /etc/hosts; then
     echo "127.0.0.1 kafka clickhouse clickhouse-coordinator objectstorage" >> /etc/hosts
-    echo ">>> /etc/hosts amended for PostHog services"
+    echo "/etc/hosts amended for PostHog services"
 else
-    echo ">>> /etc/hosts already contains required entries"
+    echo "/etc/hosts already contains required entries"
 fi
+section_end "Hosts Config"
 '''
 
 
 def get_flox_activate() -> str:
     """Generate Flox environment activation section."""
     return '''
-# ========================================
-# 8a. Activate Flox Environment
-# ========================================
-echo ">>> Activating Flox environment (this installs all dependencies)"
-echo ">>> This may take several minutes on first run..."
+section_start "Flox Activate"
+echo "This installs all dependencies and may take several minutes on first run..."
 
 # Run flox activate in non-interactive mode to install all dependencies
 # The on-activate hook in .flox/env/manifest.toml handles:
@@ -120,43 +111,39 @@ echo ">>> This may take several minutes on first run..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 'Flox environment activated'" || true
 
 # Download GeoLite2 database
-echo ">>> Downloading GeoLite2 database"
+echo "Downloading GeoLite2 database..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
+section_end "Flox Activate"
 '''
 
 
 def get_docker_services() -> str:
     """Generate Docker services startup and migrations section."""
     return '''
-# ========================================
-# 8b. Start Docker Services & Run Migrations
-# ========================================
-echo ">>> Starting Docker services"
+section_start "Docker Services"
 # Use || true to continue even if some containers fail (e.g., port conflicts with otel-collector)
 su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml up -d" || true
 
-echo ">>> Waiting for Docker services to be ready..."
+echo "Waiting for Docker services to be ready..."
 sleep 30
 
 # Ensure critical services are running (db, redis, clickhouse, kafka)
-echo ">>> Verifying critical services..."
+echo "Verifying critical services..."
 su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml ps db redis clickhouse kafka"
 
-echo ">>> Running database migrations"
+echo "Running database migrations..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/migrate" || true
 
-echo ">>> Generating demo data"
+echo "Generating demo data..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- python manage.py generate_demo_data" || true
+section_end "Docker Services"
 '''
 
 
 def get_start_script() -> str:
     """Generate PostHog start in screen session section."""
     return '''
-# ========================================
-# 8d. Start PostHog in Screen Session
-# ========================================
-echo ">>> Starting PostHog in background screen session"
+section_start "Start PostHog"
 
 # Wait a bit for migrations to settle
 sleep 10
@@ -168,6 +155,6 @@ sleep 10
 # - Runs mprocs via flox activate
 su - ph -c "screen -dmS ph /home/ph/start-posthog.sh"
 
-echo ">>> PostHog started in screen session 'ph'"
-echo ">>> Attach with: screen -r ph"
+echo "PostHog started in screen session 'ph' - attach with: screen -r ph"
+section_end "Start PostHog"
 '''

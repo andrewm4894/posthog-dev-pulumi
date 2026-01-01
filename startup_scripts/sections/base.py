@@ -8,12 +8,10 @@ from constants import DOCKER_CONFIG, FLOX_VERSION
 def get_system_updates() -> str:
     """Generate system updates section."""
     return '''
-# ========================================
-# 1. System Updates
-# ========================================
-echo ">>> Updating system packages"
+section_start "System Updates"
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+section_end "System Updates"
 '''
 
 
@@ -21,10 +19,7 @@ def get_docker_install() -> str:
     """Generate Docker installation section."""
     docker_config_json = json.dumps(DOCKER_CONFIG, indent=4)
     return f'''
-# ========================================
-# 2. Install Docker
-# ========================================
-echo ">>> Installing Docker"
+section_start "Docker Install"
 apt-get install -y \\
     apt-transport-https \\
     ca-certificates \\
@@ -48,43 +43,38 @@ cat > /etc/docker/daemon.json << 'DOCKEREOF'
 DOCKEREOF
 
 systemctl restart docker
+section_end "Docker Install"
 '''
 
 
 def get_flox_install() -> str:
     """Generate Flox installation section."""
     return f'''
-# ========================================
-# 5. Install Flox
-# ========================================
-echo ">>> Installing Flox (PostHog's recommended dev environment manager)"
+section_start "Flox Install"
 
 # Install Flox via .deb package - see https://flox.dev/docs/install-flox/install/
 wget -q "https://downloads.flox.dev/by-env/stable/deb/flox-{FLOX_VERSION}.x86_64-linux.deb" -O /tmp/flox.deb
 dpkg -i /tmp/flox.deb
 rm /tmp/flox.deb
 
-echo ">>> Flox installed"
+echo "Flox installed:"
 flox --version
 
 # Configure Flox to disable direnv prompts (enables headless/non-interactive activation)
-echo ">>> Configuring Flox for headless operation"
 mkdir -p /home/ph/.config/flox
 cat > /home/ph/.config/flox/flox.toml << 'FLOXCONFIGEOF'
 [features]
 direnv = false
 FLOXCONFIGEOF
 chown -R ph:ph /home/ph/.config
+section_end "Flox Install"
 '''
 
 
 def get_system_deps() -> str:
     """Generate system dependencies installation section."""
     return '''
-# ========================================
-# 4. Install System Dependencies
-# ========================================
-echo ">>> Installing system dependencies"
+section_start "System Dependencies"
 
 # Build essentials and common tools (Flox handles dev tools)
 apt-get install -y \\
@@ -97,18 +87,17 @@ apt-get install -y \\
     jq \\
     unzip \\
     screen
+section_end "System Dependencies"
 '''
 
 
 def get_user_creation() -> str:
     """Generate user creation section."""
     return '''
-# ========================================
-# 3. Create Development User
-# ========================================
-echo ">>> Creating ph user"
+section_start "User Creation"
 if ! id ph &>/dev/null; then
     useradd -m -s /bin/bash ph
 fi
 usermod -aG docker,sudo ph
+section_end "User Creation"
 '''

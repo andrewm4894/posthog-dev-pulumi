@@ -9,12 +9,9 @@ def get_claude_code_install(claude_code: ClaudeCodeConfig) -> str:
         return ""
 
     return '''
-# ========================================
-# 2c. Install Claude Code (binary)
-# ========================================
-echo ">>> Installing Claude Code binary"
+section_start "Claude Code Install"
 curl -fsSL https://claude.ai/install.sh | bash
-echo ">>> Claude Code binary installed (user config will be done after user creation)"
+section_end "Claude Code Install"
 '''
 
 
@@ -24,10 +21,7 @@ def get_claude_code_config(claude_code: ClaudeCodeConfig) -> str:
         return ""
 
     return f'''
-# ========================================
-# 3b. Configure Claude Code for ph user
-# ========================================
-echo ">>> Configuring Claude Code for ph user"
+section_start "Claude Code Config"
 
 # Create Claude Code configuration directory for ph user
 mkdir -p /home/ph/.claude
@@ -51,7 +45,7 @@ alias claude='~/.local/bin/claude'
 CLAUDEENVEOF
 
 chown -R ph:ph /home/ph/.claude
-echo ">>> Claude Code configured for ph user"
+section_end "Claude Code Config"
 '''
 
 
@@ -61,10 +55,7 @@ def get_codex_cli_config(codex_cli: CodexCliConfig) -> str:
         return ""
 
     return f'''
-# ========================================
-# 3d. Configure OpenAI Codex CLI for ph user
-# ========================================
-echo ">>> Installing OpenAI Codex CLI for ph user"
+section_start "Codex CLI"
 
 # Install Codex CLI globally using npm (available via Flox)
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- npm install -g @openai/codex" || true
@@ -76,5 +67,5 @@ cat >> /home/ph/.bashrc << 'CODEXENVEOF'
 export OPENAI_API_KEY="{codex_cli.api_key}"
 CODEXENVEOF
 
-echo ">>> Codex CLI installed for ph user"
+section_end "Codex CLI"
 '''

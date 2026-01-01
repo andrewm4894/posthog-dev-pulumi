@@ -6,10 +6,7 @@ from constants import SYSCTL_SETTINGS
 def get_makefile() -> str:
     """Generate Makefile creation section."""
     return '''
-# ========================================
-# 8c. Create Makefile for Common Commands
-# ========================================
-echo ">>> Creating Makefile"
+section_start "Makefile"
 
 cat > /home/ph/posthog/Makefile.dev << 'MAKEFILEEOF'
 # PostHog Development VM - Handy Commands
@@ -82,16 +79,14 @@ help:
 MAKEFILEEOF
 
 chown ph:ph /home/ph/posthog/Makefile.dev
+section_end "Makefile"
 '''
 
 
 def get_bashrc() -> str:
     """Generate bashrc configuration section."""
     return '''
-# ========================================
-# 9. Setup Shell Environment
-# ========================================
-echo ">>> Configuring shell environment"
+section_start "Bashrc"
 
 cat >> /home/ph/.bashrc << 'BASHRCEOF'
 
@@ -147,6 +142,7 @@ echo ""
 BASHRCEOF
 
 chown ph:ph /home/ph/.bashrc
+section_end "Bashrc"
 '''
 
 
@@ -155,10 +151,7 @@ def get_sysctl_and_docker_pull() -> str:
     sysctl_lines = "\n".join(f"{k}={v}" for k, v in SYSCTL_SETTINGS.items())
 
     return f'''
-# ========================================
-# 10. Final Setup
-# ========================================
-echo ">>> Running final setup"
+section_start "Sysctl and Docker Pull"
 
 # Increase system limits for Docker/ClickHouse
 cat >> /etc/sysctl.conf << 'SYSCTLEOF'
@@ -168,17 +161,26 @@ SYSCTLEOF
 sysctl -p
 
 # Pre-pull Docker images to speed up first start
-echo ">>> Pre-pulling Docker images (this may take a while)"
+echo "Pre-pulling Docker images (this may take a while)..."
 su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev-minimal.yml pull" || true
+section_end "Sysctl and Docker Pull"
 '''
 
 
 def get_final_message() -> str:
     """Generate final completion message."""
     return '''
+TOTAL_TIME=$(($(date +%s) - SCRIPT_START_TIME))
+echo ""
 echo "========================================"
 echo "PostHog Dev VM Startup Complete - $(date)"
+echo "Total time: ${TOTAL_TIME}s ($(($TOTAL_TIME / 60))m $(($TOTAL_TIME % 60))s)"
 echo "========================================"
+echo ""
+echo "TIMING SUMMARY (see /var/log/posthog-startup-timing.log for CSV):"
+echo "----------------------------------------"
+cat "$TIMING_FILE" | column -t -s,
+echo "----------------------------------------"
 echo ""
 echo "PostHog is running in a screen session!"
 echo ""

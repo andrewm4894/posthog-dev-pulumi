@@ -98,11 +98,35 @@ def generate_startup_script(
 set -ex
 
 LOG_FILE="/var/log/posthog-startup.log"
+TIMING_FILE="/var/log/posthog-startup-timing.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
+
+# Timing functions for measuring section duration
+SCRIPT_START_TIME=$(date +%s)
+SECTION_START_TIME=$SCRIPT_START_TIME
+
+section_start() {{
+    local section_name="$1"
+    SECTION_START_TIME=$(date +%s)
+    echo ""
+    echo "========================================"
+    echo ">>> [$section_name] Starting at $(date '+%H:%M:%S')"
+    echo "========================================"
+}}
+
+section_end() {{
+    local section_name="$1"
+    local end_time=$(date +%s)
+    local duration=$((end_time - SECTION_START_TIME))
+    local total_elapsed=$((end_time - SCRIPT_START_TIME))
+    echo ">>> [$section_name] Completed in ${{duration}}s (total: ${{total_elapsed}}s)"
+    echo "$section_name,$duration,$total_elapsed" >> "$TIMING_FILE"
+}}
 
 echo "========================================"
 echo "PostHog Dev VM Startup - $(date)"
 echo "========================================"
+echo "section,duration_sec,total_elapsed_sec" > "$TIMING_FILE"
 
 {get_system_updates()}
 {get_ops_agent_install(monitoring)}
