@@ -2,7 +2,7 @@
 
 import json
 
-from config import ClaudeCodeConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
+from config import ClaudeCodeConfig, CodexCliConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
 from constants import (
     DEFAULT_MPROCS_CONFIG,
     DOCKER_CONFIG,
@@ -19,6 +19,7 @@ def generate_startup_script(
     monitoring: MonitoringConfig | None = None,
     claude_code: ClaudeCodeConfig | None = None,
     remote_desktop: RemoteDesktopConfig | None = None,
+    codex_cli: CodexCliConfig | None = None,
 ) -> str:
     """Generate a complete startup script for PostHog development.
 
@@ -38,6 +39,7 @@ def generate_startup_script(
     6. Activates Flox environment (installs all deps via on-activate hook)
     7. Installs Claude Code (optional)
     8. Installs Remote Desktop - XFCE + xrdp + Chrome (optional)
+    9. Installs OpenAI Codex CLI (optional)
 
     Args:
         posthog_branch: Git branch for PostHog repo
@@ -46,6 +48,7 @@ def generate_startup_script(
         monitoring: Monitoring agents configuration
         claude_code: Claude Code installation configuration
         remote_desktop: Remote desktop (xrdp) configuration
+        codex_cli: OpenAI Codex CLI installation configuration
 
     Returns:
         Complete bash startup script as string
@@ -54,6 +57,7 @@ def generate_startup_script(
     monitoring = monitoring or MonitoringConfig()
     claude_code = claude_code or ClaudeCodeConfig()
     remote_desktop = remote_desktop or RemoteDesktopConfig()
+    codex_cli = codex_cli or CodexCliConfig()
 
     # Build GCP Ops Agent installation
     ops_agent_install = ""
@@ -199,6 +203,28 @@ echo "ph:{remote_desktop.password}" | chpasswd
 
 echo ">>> Remote Desktop configured - connect via RDP to port 3389"
 echo ">>> Username: ph"
+'''
+
+    # Build Codex CLI installation (user config - needs npm from Flox)
+    codex_cli_user_config = ""
+    if codex_cli.enabled and codex_cli.api_key:
+        codex_cli_user_config = f'''
+# ========================================
+# 3d. Configure OpenAI Codex CLI for ph user
+# ========================================
+echo ">>> Installing OpenAI Codex CLI for ph user"
+
+# Install Codex CLI globally using npm (available via Flox)
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- npm install -g @openai/codex" || true
+
+# Set environment variable for API key in user's profile
+cat >> /home/ph/.bashrc << 'CODEXENVEOF'
+
+# OpenAI Codex CLI configuration
+export OPENAI_API_KEY="{codex_cli.api_key}"
+CODEXENVEOF
+
+echo ">>> Codex CLI installed for ph user"
 '''
 
     # Build the additional repos clone commands
@@ -408,6 +434,7 @@ su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 
 echo ">>> Downloading GeoLite2 database"
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
 
+{codex_cli_user_config}
 # ========================================
 # 8b. Start Docker Services & Run Migrations
 # ========================================

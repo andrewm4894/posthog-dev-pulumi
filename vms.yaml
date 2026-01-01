@@ -44,6 +44,13 @@ remote_desktop:
   # Connect with any RDP client to <external-ip>:3389
   # Username: ph
 
+# OpenAI Codex CLI configuration
+codex_cli:
+  # Enable Codex CLI installation on VMs
+  enabled: true
+  # IMPORTANT: Store the API key as a Pulumi secret:
+  #   pulumi config set --secret openaiApiKey "YOUR_API_KEY"
+
 # VM definitions
 # Uncomment and modify to create VMs
 vms:

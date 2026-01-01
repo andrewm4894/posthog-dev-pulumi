@@ -2,7 +2,7 @@
 
 from pulumi_gcp import compute
 
-from config import ClaudeCodeConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
+from config import ClaudeCodeConfig, CodexCliConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
 from startup_scripts.full_startup import generate_startup_script
 
 
@@ -13,6 +13,7 @@ def create_dev_vm(
     monitoring: MonitoringConfig | None = None,
     claude_code: ClaudeCodeConfig | None = None,
     remote_desktop: RemoteDesktopConfig | None = None,
+    codex_cli: CodexCliConfig | None = None,
 ) -> compute.Instance:
     """Create a development VM for PostHog.
 
@@ -23,6 +24,7 @@ def create_dev_vm(
         monitoring: Monitoring agents configuration
         claude_code: Claude Code installation configuration
         remote_desktop: Remote desktop (xrdp) configuration
+        codex_cli: OpenAI Codex CLI installation configuration
 
     Returns:
         The created compute instance
@@ -35,6 +37,7 @@ def create_dev_vm(
         monitoring=monitoring,
         claude_code=claude_code,
         remote_desktop=remote_desktop,
+        codex_cli=codex_cli,
     )
 
     # Prepare labels

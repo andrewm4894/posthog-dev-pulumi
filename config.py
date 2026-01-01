@@ -66,6 +66,14 @@ class RemoteDesktopConfig:
 
 
 @dataclass
+class CodexCliConfig:
+    """Configuration for OpenAI Codex CLI installation."""
+
+    enabled: bool = True
+    api_key: str = ""  # Loaded from Pulumi secret
+
+
+@dataclass
 class VMsYamlConfig:
     """Configuration loaded from vms.yaml file."""
 
@@ -74,6 +82,7 @@ class VMsYamlConfig:
     monitoring: dict
     claude_code: dict
     remote_desktop: dict
+    codex_cli: dict
 
 
 def _load_yaml_config() -> Optional[VMsYamlConfig]:
@@ -91,6 +100,7 @@ def _load_yaml_config() -> Optional[VMsYamlConfig]:
         monitoring=data.get("monitoring", {}),
         claude_code=data.get("claude_code", {}),
         remote_desktop=data.get("remote_desktop", {}),
+        codex_cli=data.get("codex_cli", {}),
     )
 
 
@@ -225,6 +235,24 @@ def load_remote_desktop_config(config: Config) -> RemoteDesktopConfig:
     return RemoteDesktopConfig(
         enabled=remote_desktop.get("enabled", True),
         password=password,
+    )
+
+
+def load_codex_cli_config(config: Config) -> CodexCliConfig:
+    """Load OpenAI Codex CLI configuration from vms.yaml and Pulumi secrets.
+
+    Returns:
+        CodexCliConfig with Codex CLI settings
+    """
+    yaml_config = _load_yaml_config()
+    codex_cli = yaml_config.codex_cli if yaml_config else {}
+
+    # API key is stored as a Pulumi secret
+    api_key = config.get("openaiApiKey") or ""
+
+    return CodexCliConfig(
+        enabled=codex_cli.get("enabled", True),
+        api_key=api_key,
     )
 
 
