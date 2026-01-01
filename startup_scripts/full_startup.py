@@ -131,9 +131,11 @@ echo ">>> Claude Code configured for posthog-dev user"
 '''
 
     # Build Remote Desktop (xrdp + XFCE + Chrome) installation
+    # Split into package install (before user creation) and user config (after user creation)
     remote_desktop_install = ""
+    remote_desktop_user_config = ""
     if remote_desktop.enabled and remote_desktop.password:
-        remote_desktop_install = f'''
+        remote_desktop_install = '''
 # ========================================
 # 2d. Install Remote Desktop (xrdp + XFCE + Chrome)
 # ========================================
@@ -160,8 +162,27 @@ wget -q https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.d
 apt-get install -y /tmp/crd.deb || apt-get install -y -f
 rm /tmp/crd.deb
 
-# Add posthog-dev to chrome-remote-desktop group
-usermod -aG chrome-remote-desktop posthog-dev
+# Enable and start xrdp (user config happens after user creation)
+systemctl enable xrdp
+systemctl start xrdp
+
+echo ">>> Remote Desktop packages installed (user config will be done after user creation)"
+'''
+        remote_desktop_user_config = f'''
+# ========================================
+# 3c. Configure Remote Desktop for posthog-dev user
+# ========================================
+echo ">>> Configuring Remote Desktop for posthog-dev user"
+
+# Add posthog-dev to chrome-remote-desktop group (if it exists)
+if getent group chrome-remote-desktop > /dev/null 2>&1; then
+    usermod -aG chrome-remote-desktop posthog-dev
+    echo ">>> Added posthog-dev to chrome-remote-desktop group"
+else
+    echo ">>> Warning: chrome-remote-desktop group not found, creating it"
+    groupadd chrome-remote-desktop
+    usermod -aG chrome-remote-desktop posthog-dev
+fi
 
 # Configure Chrome Remote Desktop to use XFCE
 mkdir -p /home/posthog-dev/.chrome-remote-desktop-session
@@ -176,11 +197,7 @@ chown posthog-dev:posthog-dev /home/posthog-dev/.xsession
 # Set password for posthog-dev user (for RDP login)
 echo "posthog-dev:{remote_desktop.password}" | chpasswd
 
-# Enable and start xrdp
-systemctl enable xrdp
-systemctl start xrdp
-
-echo ">>> Remote Desktop installed - connect via RDP to port 3389"
+echo ">>> Remote Desktop configured - connect via RDP to port 3389"
 echo ">>> Username: posthog-dev"
 '''
 
@@ -275,6 +292,7 @@ fi
 usermod -aG docker posthog-dev
 
 {claude_code_user_config}
+{remote_desktop_user_config}
 # ========================================
 # 4. Install System Dependencies
 # ========================================
