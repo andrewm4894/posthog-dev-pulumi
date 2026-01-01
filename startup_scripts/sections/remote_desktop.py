@@ -11,17 +11,11 @@ def get_remote_desktop_install(remote_desktop: RemoteDesktopConfig) -> str:
     return '''
 section_start "Remote Desktop Install"
 
-echo "Installing XFCE desktop environment..."
+echo "Installing XFCE desktop environment (minimal)..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y \\
-    xfce4 xfce4-goodies \\
+    xfce4 \\
     dbus-x11 \\
     xorg
-
-echo "Installing xrdp (RDP server)..."
-apt-get install -y xrdp
-
-# Add xrdp user to ssl-cert group (required for TLS)
-usermod -aG ssl-cert xrdp
 
 echo "Installing Chrome browser..."
 wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
@@ -33,10 +27,6 @@ echo "Installing Chrome Remote Desktop..."
 wget -q https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb -O /tmp/crd.deb
 apt-get install -y /tmp/crd.deb || apt-get install -y -f
 rm /tmp/crd.deb
-
-# Enable and start xrdp (user config happens after user creation)
-systemctl enable xrdp
-systemctl start xrdp
 
 section_end "Remote Desktop Install"
 '''
@@ -65,13 +55,10 @@ echo "exec /usr/bin/xfce4-session" > /home/ph/.chrome-remote-desktop-session
 chmod +x /home/ph/.chrome-remote-desktop-session
 chown ph:ph /home/ph/.chrome-remote-desktop-session
 
-# Configure XFCE as the session for xrdp
-echo "xfce4-session" > /home/ph/.xsession
-chown ph:ph /home/ph/.xsession
-
-# Set password for ph user (for RDP login)
+# Set password for ph user (needed for sudo in desktop session)
 echo "ph:{remote_desktop.password}" | chpasswd
 
-echo "Remote Desktop configured - connect via RDP to port 3389 (user: ph)"
+echo "Chrome Remote Desktop configured"
+echo "To set up: SSH in, run the setup command from https://remotedesktop.google.com/headless"
 section_end "Remote Desktop Config"
 '''
