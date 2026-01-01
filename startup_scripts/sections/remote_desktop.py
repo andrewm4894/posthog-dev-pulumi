@@ -1,4 +1,4 @@
-"""Remote Desktop: xrdp, XFCE, Chrome, and Chrome Remote Desktop."""
+"""Remote Desktop: XFCE and Chrome Remote Desktop."""
 
 from config import RemoteDesktopConfig
 
@@ -14,6 +14,7 @@ section_start "Remote Desktop Install"
 echo "Installing XFCE desktop environment (minimal)..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y \\
     xfce4 \\
+    xfce4-terminal \\
     dbus-x11 \\
     xorg
 
