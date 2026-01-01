@@ -314,7 +314,7 @@ echo ">>> Creating ph user"
 if ! id ph &>/dev/null; then
     useradd -m -s /bin/bash ph
 fi
-usermod -aG docker ph
+usermod -aG docker,sudo ph
 
 {claude_code_user_config}
 {remote_desktop_user_config}
