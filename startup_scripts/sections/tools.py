@@ -105,15 +105,14 @@ def get_codex_cli_config(codex_cli: CodexCliConfig) -> str:
     return f'''
 section_start "Codex CLI"
 
-# Install Codex CLI to user-local npm prefix to avoid Nix store perms
-su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bash -lc 'npm config set prefix /home/ph/.local && npm install -g @openai/codex'" || true
+# Install system Node.js (Codex runs outside Flox)
+if ! command -v node >/dev/null 2>&1; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
 
-# Install a global wrapper so `codex` works from any directory
-cat > /usr/local/bin/codex << 'CODEXWRAPEOF'
-#!/bin/bash
-exec /usr/bin/env bash -lc 'cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- /home/ph/.local/bin/codex "$@"'
-CODEXWRAPEOF
-chmod 755 /usr/local/bin/codex
+# Install Codex CLI globally
+npm install -g @openai/codex
 
 # Store OpenAI API key in secrets file
 install -d -m 700 /home/ph/.config/posthog
