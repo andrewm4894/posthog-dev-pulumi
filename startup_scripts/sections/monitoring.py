@@ -20,16 +20,29 @@ section_end "GCP Ops Agent"
 
 def get_netdata_install(monitoring: MonitoringConfig) -> str:
     """Generate Netdata installation section."""
-    if not monitoring.netdata_enabled or not monitoring.netdata_claim_token:
+    if not monitoring.netdata_enabled:
         return ""
 
     return f'''
 section_start "Netdata"
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive \\
-    --claim-token {monitoring.netdata_claim_token} \\
-    --claim-rooms {monitoring.netdata_claim_rooms} \\
-    --claim-url {monitoring.netdata_claim_url}
-rm /tmp/netdata-kickstart.sh
-section_end "Netdata"
+if [ "$SKIP_HEAVY" = "1" ]; then
+    echo "Skipping Netdata install (base image detected)"
+    section_end "Netdata"
+else
+    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+    netdata_token=""
+    if [ -n "{monitoring.netdata_claim_token_secret_name}" ]; then
+        netdata_token="$(fetch_secret "{monitoring.netdata_claim_token_secret_name}" || true)"
+    fi
+    if [ -n "$netdata_token" ]; then
+        NETDATA_CLAIM_TOKEN="$netdata_token" \\
+        NETDATA_CLAIM_ROOMS="{monitoring.netdata_claim_rooms}" \\
+        NETDATA_CLAIM_URL="{monitoring.netdata_claim_url}" \\
+            sh /tmp/netdata-kickstart.sh --stable-channel --non-interactive
+    else
+        echo "Netdata claim token not set; skipping Netdata claim."
+    fi
+    rm /tmp/netdata-kickstart.sh
+    section_end "Netdata"
+fi
 '''

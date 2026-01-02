@@ -5,7 +5,7 @@ from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig
 
 def get_claude_code(claude_code: ClaudeCodeConfig) -> str:
     """Generate Claude Code install and configuration section (run after user creation)."""
-    if not claude_code.enabled or not claude_code.api_key:
+    if not claude_code.enabled:
         return ""
 
     return f'''
@@ -26,16 +26,26 @@ cat > /home/ph/.claude/settings.json << 'CLAUDEEOF'
 }}
 CLAUDEEOF
 
-# Set environment variables for headless use
+# Write secrets to a protected file instead of .bashrc
+install -d -m 700 /home/ph/.config/posthog
+claude_key=""
+if [ -n "{claude_code.api_key_secret_name}" ]; then
+    claude_key="$(fetch_secret "{claude_code.api_key_secret_name}" || true)"
+fi
+if [ -n "$claude_key" ]; then
+    printf 'CLAUDE_CODE_API_KEY=%s\n' "$claude_key" >> /home/ph/.config/posthog/secrets.env
+    chmod 600 /home/ph/.config/posthog/secrets.env
+fi
+
+# Set non-secret environment settings
 cat >> /home/ph/.bashrc << 'CLAUDEENVEOF'
 
 # Claude Code configuration
-export CLAUDE_CODE_API_KEY="{claude_code.api_key}"
 export DISABLE_AUTOUPDATER=1
 export PATH="$HOME/.local/bin:$PATH"
 CLAUDEENVEOF
 
-chown -R ph:ph /home/ph/.claude
+chown -R ph:ph /home/ph/.claude /home/ph/.config/posthog
 section_end "Claude Code"
 '''
 
@@ -59,14 +69,19 @@ apt-get install -y gh
 '''
 
     # Add token configuration if provided
-    if github_cli.token:
+    if github_cli.token_secret_name:
         script += f'''
-# Set GitHub token for authentication
-cat >> /home/ph/.bashrc << 'GHENVEOF'
-
-# GitHub CLI configuration
-export GH_TOKEN="{github_cli.token}"
-GHENVEOF
+# Store GitHub token in secrets file
+install -d -m 700 /home/ph/.config/posthog
+gh_token=""
+if [ -n "{github_cli.token_secret_name}" ]; then
+    gh_token="$(fetch_secret "{github_cli.token_secret_name}" || true)"
+fi
+if [ -n "$gh_token" ]; then
+    printf 'GH_TOKEN=%s\n' "$gh_token" >> /home/ph/.config/posthog/secrets.env
+    chmod 600 /home/ph/.config/posthog/secrets.env
+fi
+chown -R ph:ph /home/ph/.config/posthog
 '''
 
     script += '''
@@ -77,21 +92,26 @@ section_end "GitHub CLI"
 
 def get_codex_cli_config(codex_cli: CodexCliConfig) -> str:
     """Generate OpenAI Codex CLI configuration section (run after Flox activation)."""
-    if not codex_cli.enabled or not codex_cli.api_key:
+    if not codex_cli.enabled:
         return ""
 
     return f'''
 section_start "Codex CLI"
 
-# Install Codex CLI globally using npm (available via Flox)
-su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- npm install -g @openai/codex" || true
+# Install Codex CLI to user-local npm prefix to avoid Nix store perms
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- npm config set prefix '$HOME/.local' && npm install -g @openai/codex" || true
 
-# Set environment variable for API key in user's profile
-cat >> /home/ph/.bashrc << 'CODEXENVEOF'
-
-# OpenAI Codex CLI configuration
-export OPENAI_API_KEY="{codex_cli.api_key}"
-CODEXENVEOF
+# Store OpenAI API key in secrets file
+install -d -m 700 /home/ph/.config/posthog
+openai_key=""
+if [ -n "{codex_cli.api_key_secret_name}" ]; then
+    openai_key="$(fetch_secret "{codex_cli.api_key_secret_name}" || true)"
+fi
+if [ -n "$openai_key" ]; then
+    printf 'OPENAI_API_KEY=%s\n' "$openai_key" >> /home/ph/.config/posthog/secrets.env
+    chmod 600 /home/ph/.config/posthog/secrets.env
+fi
+chown -R ph:ph /home/ph/.config/posthog
 
 section_end "Codex CLI"
 '''

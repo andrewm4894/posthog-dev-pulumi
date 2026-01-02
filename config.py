@@ -14,10 +14,12 @@ class RepoConfig:
     """Configuration for a repository to clone."""
 
     url: str
-    branch: str = "master"
+    branch: Optional[str] = None
     target_dir: Optional[str] = None
 
     def __post_init__(self):
+        if self.branch == "":
+            self.branch = None
         if self.target_dir is None:
             # Extract repo name from URL
             self.target_dir = self.url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -46,7 +48,7 @@ class MonitoringConfig:
     netdata_enabled: bool = False
     netdata_claim_url: str = ""
     netdata_claim_rooms: str = ""
-    netdata_claim_token: str = ""  # Loaded from Pulumi secret
+    netdata_claim_token_secret_name: str = ""  # Secret Manager secret name
 
 
 @dataclass
@@ -54,7 +56,7 @@ class ClaudeCodeConfig:
     """Configuration for Claude Code installation."""
 
     enabled: bool = True
-    api_key: str = ""  # Loaded from Pulumi secret
+    api_key_secret_name: str = ""  # Secret Manager secret name
 
 
 @dataclass
@@ -62,7 +64,7 @@ class RemoteDesktopConfig:
     """Configuration for Chrome Remote Desktop access."""
 
     enabled: bool = True
-    password: str = ""  # Loaded from Pulumi secret (used for sudo in desktop session)
+    password_secret_name: str = ""  # Secret Manager secret name
 
 
 @dataclass
@@ -70,7 +72,7 @@ class CodexCliConfig:
     """Configuration for OpenAI Codex CLI installation."""
 
     enabled: bool = True
-    api_key: str = ""  # Loaded from Pulumi secret
+    api_key_secret_name: str = ""  # Secret Manager secret name
 
 
 @dataclass
@@ -78,7 +80,7 @@ class GitHubCliConfig:
     """Configuration for GitHub CLI installation."""
 
     enabled: bool = True
-    token: str = ""  # Loaded from Pulumi secret
+    token_secret_name: str = ""  # Secret Manager secret name
 
 
 @dataclass
@@ -125,24 +127,31 @@ def load_vm_configs(config: Config) -> list[VMConfig]:
     Returns:
         List of VMConfig objects
     """
+    base_image = config.get("baseImage") or ""
+    gcp_project = Config("gcp").get("project") or ""
+
     # First, try loading from vms.yaml
     yaml_config = _load_yaml_config()
     if yaml_config and yaml_config.vms:
-        defaults = yaml_config.defaults
-        return [_parse_vm_config(vm, defaults) for vm in yaml_config.vms]
+        defaults = dict(yaml_config.defaults)
+        if base_image and not defaults.get("os_image"):
+            defaults["os_image"] = base_image
+        return [_parse_vm_config(vm, defaults, gcp_project) for vm in yaml_config.vms]
 
     # Check for multi-VM configuration in Pulumi config
     vms_json = config.get("vms")
     if vms_json:
         vms_data = json.loads(vms_json)
-        return [_parse_vm_config(vm) for vm in vms_data]
+        return [_parse_vm_config(vm, project=gcp_project) for vm in vms_data]
 
     # Single VM mode - use individual config keys
     name = config.get("vmName") or "posthog-dev-1"
     description = config.get("vmDescription") or "PostHog development VM"
     machine_type = config.get("machineType") or "e2-standard-8"
     disk_size_gb = int(config.get("diskSizeGb") or "100")
-    os_image = config.get("osImage") or "ubuntu-os-cloud/ubuntu-2204-lts"
+    os_image = config.get("osImage") or base_image or "ubuntu-os-cloud/ubuntu-2204-lts"
+    if gcp_project and isinstance(os_image, str):
+        os_image = _interpolate_project(os_image, gcp_project)
     posthog_branch = config.get("posthogBranch") or "master"
     enable_minimal = config.get_bool("enableMinimalMode") or False
 
@@ -176,16 +185,15 @@ def load_monitoring_config(config: Config) -> MonitoringConfig:
     yaml_config = _load_yaml_config()
     monitoring = yaml_config.monitoring if yaml_config else {}
 
-    # Netdata settings from Pulumi config (token is a secret)
-    netdata_claim_token = config.get("netdataClaimToken") or ""
     netdata_claim_rooms = config.get("netdataClaimRooms") or ""
+    netdata_claim_token_secret_name = config.get("netdataClaimTokenSecretName") or ""
 
     return MonitoringConfig(
         ops_agent_enabled=monitoring.get("ops_agent_enabled", True),
         netdata_enabled=monitoring.get("netdata_enabled", False),
         netdata_claim_url=monitoring.get("netdata_claim_url", "https://app.netdata.cloud"),
         netdata_claim_rooms=netdata_claim_rooms,
-        netdata_claim_token=netdata_claim_token,
+        netdata_claim_token_secret_name=monitoring.get("netdata_claim_token_secret_name", netdata_claim_token_secret_name),
     )
 
 
@@ -198,12 +206,11 @@ def load_claude_code_config(config: Config) -> ClaudeCodeConfig:
     yaml_config = _load_yaml_config()
     claude_code = yaml_config.claude_code if yaml_config else {}
 
-    # API key is stored as a Pulumi secret
-    api_key = config.get("anthropicApiKey") or ""
+    api_key_secret_name = config.get("anthropicSecretName") or ""
 
     return ClaudeCodeConfig(
         enabled=claude_code.get("enabled", True),
-        api_key=api_key,
+        api_key_secret_name=claude_code.get("secret_name", api_key_secret_name),
     )
 
 
@@ -216,12 +223,11 @@ def load_remote_desktop_config(config: Config) -> RemoteDesktopConfig:
     yaml_config = _load_yaml_config()
     remote_desktop = yaml_config.remote_desktop if yaml_config else {}
 
-    # Password is stored as a Pulumi secret (used for sudo in desktop session)
-    password = config.get("rdpPassword") or ""
+    password_secret_name = config.get("rdpPasswordSecretName") or ""
 
     return RemoteDesktopConfig(
         enabled=remote_desktop.get("enabled", True),
-        password=password,
+        password_secret_name=remote_desktop.get("password_secret_name", password_secret_name),
     )
 
 
@@ -234,12 +240,11 @@ def load_codex_cli_config(config: Config) -> CodexCliConfig:
     yaml_config = _load_yaml_config()
     codex_cli = yaml_config.codex_cli if yaml_config else {}
 
-    # API key is stored as a Pulumi secret
-    api_key = config.get("openaiApiKey") or ""
+    api_key_secret_name = config.get("openaiSecretName") or ""
 
     return CodexCliConfig(
         enabled=codex_cli.get("enabled", True),
-        api_key=api_key,
+        api_key_secret_name=codex_cli.get("secret_name", api_key_secret_name),
     )
 
 
@@ -252,30 +257,40 @@ def load_github_cli_config(config: Config) -> GitHubCliConfig:
     yaml_config = _load_yaml_config()
     github_cli = yaml_config.github_cli if yaml_config else {}
 
-    # Token is stored as a Pulumi secret
-    token = config.get("githubToken") or ""
+    token_secret_name = config.get("githubTokenSecretName") or ""
 
     return GitHubCliConfig(
         enabled=github_cli.get("enabled", True),
-        token=token,
+        token_secret_name=github_cli.get("secret_name", token_secret_name),
     )
 
 
-def _parse_vm_config(data: dict, defaults: Optional[dict] = None) -> VMConfig:
+def _interpolate_project(value: str, project: str) -> str:
+    return value.replace("${GCP_PROJECT}", project).replace("${PROJECT_ID}", project)
+
+
+def _parse_vm_config(data: dict, defaults: Optional[dict] = None, project: str = "") -> VMConfig:
     """Parse a VM configuration from a dictionary, with optional defaults."""
     defaults = defaults or {}
-    additional_repos = [RepoConfig(**r) for r in data.get("additional_repos", [])]
+    additional_repos_data = data.get("additional_repos")
+    if additional_repos_data is None:
+        additional_repos_data = defaults.get("additional_repos", [])
+    additional_repos = [RepoConfig(**r) for r in additional_repos_data]
 
     # Helper to get value with fallback to defaults
     def get(key: str, fallback):
         return data.get(key) if data.get(key) is not None else defaults.get(key, fallback)
+
+    os_image = get("os_image", "ubuntu-os-cloud/ubuntu-2204-lts")
+    if project and isinstance(os_image, str):
+        os_image = _interpolate_project(os_image, project)
 
     return VMConfig(
         name=data["name"],
         description=data.get("description", ""),
         machine_type=get("machine_type", "e2-standard-8"),
         disk_size_gb=get("disk_size_gb", 100),
-        os_image=get("os_image", "ubuntu-os-cloud/ubuntu-2204-lts"),
+        os_image=os_image,
         posthog_branch=get("posthog_branch", "master"),
         additional_repos=additional_repos,
         enable_minimal_mode=get("enable_minimal_mode", False),

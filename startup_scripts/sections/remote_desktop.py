@@ -5,7 +5,7 @@ from config import RemoteDesktopConfig
 
 def get_remote_desktop_install(remote_desktop: RemoteDesktopConfig) -> str:
     """Generate Remote Desktop package installation section (run before user creation)."""
-    if not remote_desktop.enabled or not remote_desktop.password:
+    if not remote_desktop.enabled:
         return ""
 
     return '''
@@ -35,7 +35,7 @@ section_end "Remote Desktop Install"
 
 def get_remote_desktop_config(remote_desktop: RemoteDesktopConfig) -> str:
     """Generate Remote Desktop user configuration section (run after user creation)."""
-    if not remote_desktop.enabled or not remote_desktop.password:
+    if not remote_desktop.enabled:
         return ""
 
     return f'''
@@ -56,8 +56,14 @@ echo "exec /usr/bin/xfce4-session" > /home/ph/.chrome-remote-desktop-session
 chmod +x /home/ph/.chrome-remote-desktop-session
 chown ph:ph /home/ph/.chrome-remote-desktop-session
 
-# Set password for ph user (needed for sudo in desktop session)
-echo "ph:{remote_desktop.password}" | chpasswd
+# Set password for ph user only if provided (needed for sudo in desktop session)
+rdp_password=""
+if [ -n "{remote_desktop.password_secret_name}" ]; then
+    rdp_password="$(fetch_secret "{remote_desktop.password_secret_name}" || true)"
+fi
+if [ -n "$rdp_password" ]; then
+    echo "ph:$rdp_password" | chpasswd
+fi
 
 echo "Chrome Remote Desktop configured"
 echo "To set up: SSH in, run the setup command from https://remotedesktop.google.com/headless"

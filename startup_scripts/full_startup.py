@@ -97,11 +97,34 @@ def generate_startup_script(
 # Uses Flox for dependency management (PostHog's recommended approach)
 # See: https://posthog.com/handbook/engineering/developing-locally#setup-with-flox-recommended
 #
-set -ex
+set -euo pipefail
 
 LOG_FILE="/var/log/posthog-startup.log"
 TIMING_FILE="/var/log/posthog-startup-timing.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
+
+SKIP_HEAVY=0
+if [ -f /etc/posthog-base-image ]; then
+    SKIP_HEAVY=1
+    echo "Base image marker detected; skipping heavy bootstrap steps."
+fi
+
+PROJECT_ID=$(curl -s -H "Metadata-Flavor: Google" \
+    http://metadata.google.internal/computeMetadata/v1/project/project-id)
+
+fetch_secret() {{
+    local secret_name="$1"
+    if [ -z "$secret_name" ]; then
+        return 1
+    fi
+    local token
+    token=$(curl -s -H "Metadata-Flavor: Google" \
+        http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | \
+        python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+    curl -s -H "Authorization: Bearer $token" \
+        "https://secretmanager.googleapis.com/v1/projects/${{PROJECT_ID}}/secrets/${{secret_name}}/versions/latest:access" | \
+        python3 -c 'import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode())'
+}}
 
 # Timing functions for measuring section duration
 SCRIPT_START_TIME=$(date +%s)

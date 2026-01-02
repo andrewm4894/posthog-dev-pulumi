@@ -8,15 +8,34 @@ def get_clone_repos(posthog_branch: str, additional_repos: list[RepoConfig]) -> 
     """Generate repository cloning section."""
     additional_clone_commands = ""
     for repo in additional_repos:
+        branch_flag = f"--branch {repo.branch} " if repo.branch else ""
+        branch_label = repo.branch or "default"
         additional_clone_commands += f'''
-echo ">>> Cloning {repo.url} (branch: {repo.branch})"
-git clone --branch {repo.branch} {repo.url} /home/ph/{repo.target_dir}
-chown -R ph:ph /home/ph/{repo.target_dir}
+if [ -d /home/ph/{repo.target_dir}/.git ]; then
+    echo "Repo {repo.url} already exists; fetching latest"
+    su - ph -c "cd /home/ph/{repo.target_dir} && git fetch origin"
+    su - ph -c "cd /home/ph/{repo.target_dir} && git pull --ff-only || true"
+else
+    echo ">>> Cloning {repo.url} (branch: {branch_label})"
+    su - ph -c "git clone {branch_flag}{repo.url} /home/ph/{repo.target_dir}"
+fi
 '''
 
     return f'''
 section_start "Clone Repositories"
 
+# If repo exists, update it to latest
+if [ -d /home/ph/posthog/.git ]; then
+    echo "PostHog repo already exists; fetching latest"
+    su - ph -c "git config --global --add safe.directory /home/ph/posthog"
+    su - ph -c "cd /home/ph/posthog && git fetch origin"
+    if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
+        su - ph -c "cd /home/ph/posthog && git checkout {posthog_branch} || echo 'Warning: could not checkout {posthog_branch}'; git pull --ff-only || echo 'Warning: could not fast-forward {posthog_branch}'"
+    else
+        su - ph -c "cd /home/ph/posthog && git checkout master || echo 'Warning: could not checkout master'; git pull --ff-only || echo 'Warning: could not fast-forward master'"
+    fi
+    section_end "Clone Repositories"
+else
 # Check if branch exists remotely
 if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
     echo "Branch '{posthog_branch}' exists, cloning directly"
@@ -33,6 +52,7 @@ chown -R ph:ph /home/ph/posthog
 
 {additional_clone_commands}
 section_end "Clone Repositories"
+fi
 '''
 
 
@@ -106,7 +126,11 @@ def get_flox_activate() -> str:
     """Generate Flox environment activation section."""
     return '''
 section_start "Flox Activate"
-echo "This installs all dependencies and may take several minutes on first run..."
+if [ "$SKIP_HEAVY" = "1" ]; then
+    echo "Skipping Flox activation (base image detected)"
+    section_end "Flox Activate"
+else
+    echo "This installs all dependencies and may take several minutes on first run..."
 
 # Run flox activate in non-interactive mode to install all dependencies
 # The on-activate hook in .flox/env/manifest.toml handles:
@@ -120,6 +144,7 @@ su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- echo 
 echo "Downloading GeoLite2 database..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- ./bin/download-mmdb" || true
 section_end "Flox Activate"
+fi
 '''
 
 
@@ -127,6 +152,10 @@ def get_docker_services() -> str:
     """Generate Docker services startup and migrations section."""
     return '''
 section_start "Docker Services"
+if [ "$SKIP_HEAVY" = "1" ]; then
+    echo "Skipping Docker services (base image detected)"
+    section_end "Docker Services"
+else
 # Use || true to continue even if some containers fail (e.g., port conflicts with otel-collector)
 su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev.yml up -d" || true
 
@@ -143,6 +172,7 @@ su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bin/m
 echo "Generating demo data..."
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- python manage.py generate_demo_data" || true
 section_end "Docker Services"
+fi
 '''
 
 

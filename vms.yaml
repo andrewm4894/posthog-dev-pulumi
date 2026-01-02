@@ -7,6 +7,15 @@ defaults:
   disk_size_gb: 100
   posthog_branch: master
   enable_minimal_mode: false
+  # Optional: extra repos to clone under /home/ph (branch omitted uses default)
+  additional_repos:
+    - url: "https://github.com/posthog/posthog.com.git"
+    - url: "https://github.com/posthog/posthog-js.git"
+    - url: "https://github.com/posthog/posthog-python.git"
+  # Optional: custom image to speed up provisioning (supports ${GCP_PROJECT})
+  # os_image: "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
+  # Or set globally via Pulumi config:
+  #   pulumi config set baseImage "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
 
 # Monitoring configuration
 monitoring:
@@ -16,23 +25,24 @@ monitoring:
   # Netdata - for real-time monitoring dashboard
   netdata_enabled: true
   netdata_claim_url: https://app.netdata.cloud
-  # IMPORTANT: Set your Netdata room and token via Pulumi config:
+  # IMPORTANT: Set your Netdata room via Pulumi config:
   #   pulumi config set netdataClaimRooms "YOUR_ROOM_ID"
-  #   pulumi config set --secret netdataClaimToken "YOUR_TOKEN"
+  # OPTIONAL: Store the claim token in Secret Manager and reference it here:
+  #   netdata_claim_token_secret_name: "netdata-claim-token"
 
 # Claude Code configuration
 claude_code:
   # Enable Claude Code installation on VMs
   enabled: true
-  # IMPORTANT: Store the API key as a Pulumi secret:
-  #   pulumi config set --secret anthropicApiKey "YOUR_API_KEY"
+  # OPTIONAL: Store the API key in Secret Manager and reference it here:
+  #   secret_name: "anthropic-api-key"
 
 # Chrome Remote Desktop configuration
 remote_desktop:
   # Enable XFCE desktop + Chrome Remote Desktop
   enabled: true
-  # IMPORTANT: Store the password as a Pulumi secret (for sudo in desktop session):
-  #   pulumi config set --secret rdpPassword "YourSecurePassword123"
+  # OPTIONAL: Store the password in Secret Manager (for sudo in desktop session):
+  #   password_secret_name: "rdp-password"
   # Setup: SSH to VM, run the command from https://remotedesktop.google.com/headless
   # Then connect via: https://remotedesktop.google.com/access
 
@@ -40,8 +50,15 @@ remote_desktop:
 codex_cli:
   # Enable Codex CLI installation on VMs
   enabled: true
-  # IMPORTANT: Store the API key as a Pulumi secret:
-  #   pulumi config set --secret openaiApiKey "YOUR_API_KEY"
+  # OPTIONAL: Store the API key in Secret Manager and reference it here:
+  #   secret_name: "openai-api-key"
+
+# GitHub CLI configuration
+github_cli:
+  # Enable GitHub CLI installation on VMs
+  enabled: true
+  # OPTIONAL: Store the token in Secret Manager and reference it here:
+  #   secret_name: "github-token"
 
 # VM definitions
 # Uncomment and modify to create VMs

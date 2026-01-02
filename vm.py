@@ -83,8 +83,7 @@ def create_dev_vm(
         # Service account with minimal permissions
         service_account=compute.InstanceServiceAccountArgs(
             scopes=[
-                "https://www.googleapis.com/auth/logging.write",
-                "https://www.googleapis.com/auth/monitoring.write",
+                "https://www.googleapis.com/auth/cloud-platform",
             ],
         ),
         # Allow stopping for updates (e.g., changing machine type)

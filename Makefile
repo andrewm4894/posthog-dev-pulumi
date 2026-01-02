@@ -155,6 +155,28 @@ logs: ## View startup script logs (usage: make logs VM=vm-name)
 	echo "$(BLUE)Fetching logs from $$VM_NAME...$(NC)"; \
 	gcloud compute ssh $$VM_NAME --tunnel-through-iap --zone=$$ZONE --project=$$PROJECT --command="sudo cat /var/log/posthog-startup.log"
 
+##@ Images
+
+.PHONY: bake-image
+bake-image: ## Create a custom image from an existing VM (usage: make bake-image VM=vm-name IMAGE=posthog-dev-base-YYYYMMDD)
+	@if [ -z "$(VM)" ] || [ -z "$(IMAGE)" ]; then \
+		echo "$(YELLOW)Usage: make bake-image VM=vm-name IMAGE=image-name$(NC)"; \
+		exit 1; \
+	fi
+	@VM_NAME=$(VM); \
+	ZONE=$$(pulumi config get gcp:zone 2>/dev/null || echo "europe-west1-b"); \
+	PROJECT=$$(pulumi config get gcp:project); \
+	echo "$(BLUE)Creating image '$$IMAGE' from VM '$$VM_NAME'...$(NC)"; \
+	echo "$(BLUE)Marking VM as base image...$(NC)"; \
+	gcloud compute ssh $$VM_NAME --tunnel-through-iap --zone=$$ZONE --project=$$PROJECT --command="sudo touch /etc/posthog-base-image" || true; \
+	echo "$(BLUE)Stopping VM for image creation...$(NC)"; \
+	gcloud compute instances stop $$VM_NAME --zone=$$ZONE --project=$$PROJECT; \
+	echo "$(BLUE)Deleting existing image (if any)...$(NC)"; \
+	gcloud compute images delete $$IMAGE --project=$$PROJECT --quiet || true; \
+	gcloud compute images create $$IMAGE --source-disk=$$VM_NAME --source-disk-zone=$$ZONE --project=$$PROJECT
+	@echo "$(BLUE)Restarting VM...$(NC)"; \
+	gcloud compute instances start $$VM_NAME --zone=$$ZONE --project=$$PROJECT
+
 ##@ Help
 
 .PHONY: help

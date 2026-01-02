@@ -92,6 +92,14 @@ cat >> /home/ph/.bashrc << 'BASHRCEOF'
 
 # PostHog Development Environment (Flox-based)
 export POSTHOG_DIR="$HOME/posthog"
+export PATH="$HOME/.local/bin:$PATH"
+
+# Load user secrets if present (keys for optional tooling)
+if [[ -f "$HOME/.config/posthog/secrets.env" ]]; then
+    set -a
+    source "$HOME/.config/posthog/secrets.env"
+    set +a
+fi
 
 # Auto-activate Flox when entering PostHog directory
 cd() {
@@ -141,6 +149,17 @@ echo "PostHog directory: $POSTHOG_DIR"
 echo ""
 BASHRCEOF
 
+# Ensure login shells also load secrets
+cat >> /home/ph/.profile << 'PROFILEEOF'
+
+# Load user secrets if present (keys for optional tooling)
+if [[ -f "$HOME/.config/posthog/secrets.env" ]]; then
+    set -a
+    . "$HOME/.config/posthog/secrets.env"
+    set +a
+fi
+PROFILEEOF
+
 chown ph:ph /home/ph/.bashrc
 section_end "Bashrc"
 '''
@@ -161,9 +180,14 @@ SYSCTLEOF
 sysctl -p
 
 # Pre-pull Docker images to speed up first start
-echo "Pre-pulling Docker images (this may take a while)..."
-su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev-minimal.yml pull" || true
-section_end "Sysctl and Docker Pull"
+if [ "$SKIP_HEAVY" = "1" ]; then
+    echo "Skipping Docker pull (base image detected)"
+    section_end "Sysctl and Docker Pull"
+else
+    echo "Pre-pulling Docker images (this may take a while)..."
+    su - ph -c "cd /home/ph/posthog && docker compose -f docker-compose.dev-minimal.yml pull" || true
+    section_end "Sysctl and Docker Pull"
+fi
 '''
 
 
