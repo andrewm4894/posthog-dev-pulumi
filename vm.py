@@ -3,7 +3,7 @@
 from pulumi import ResourceOptions
 from pulumi_gcp import compute
 
-from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
+from config import ClaudeCodeConfig, CodexCliConfig, GitConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
 from startup_scripts.full_startup import generate_startup_script
 
 
@@ -14,6 +14,7 @@ def create_dev_vm(
     monitoring: MonitoringConfig | None = None,
     claude_code: ClaudeCodeConfig | None = None,
     github_cli: GitHubCliConfig | None = None,
+    git_config: GitConfig | None = None,
     remote_desktop: RemoteDesktopConfig | None = None,
     codex_cli: CodexCliConfig | None = None,
 ) -> compute.Instance:
@@ -26,6 +27,7 @@ def create_dev_vm(
         monitoring: Monitoring agents configuration
         claude_code: Claude Code installation configuration
         github_cli: GitHub CLI installation configuration
+        git_config: Git identity configuration
         remote_desktop: Remote desktop (xrdp) configuration
         codex_cli: OpenAI Codex CLI installation configuration
 
@@ -40,6 +42,7 @@ def create_dev_vm(
         monitoring=monitoring,
         claude_code=claude_code,
         github_cli=github_cli,
+        git_config=git_config,
         remote_desktop=remote_desktop,
         codex_cli=codex_cli,
     )

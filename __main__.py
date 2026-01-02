@@ -7,7 +7,7 @@ Access is via Chrome Remote Desktop (no external ports needed for PostHog).
 import pulumi
 from pulumi import Config
 
-from config import load_claude_code_config, load_codex_cli_config, load_github_cli_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
+from config import load_claude_code_config, load_codex_cli_config, load_github_cli_config, load_git_config, load_monitoring_config, load_remote_desktop_config, load_vm_configs
 from network import create_cloud_nat, create_cloud_router, create_iap_ssh_firewall, create_network
 from vm import create_dev_vm
 
@@ -40,6 +40,9 @@ def main():
     # Load GitHub CLI configuration
     github_cli = load_github_cli_config(config)
 
+    # Load Git identity configuration
+    git_config = load_git_config(config)
+
     # Create shared network resources
     network = create_network("posthog-dev-network")
 
@@ -59,6 +62,7 @@ def main():
             monitoring=monitoring,
             claude_code=claude_code,
             github_cli=github_cli,
+            git_config=git_config,
             remote_desktop=remote_desktop,
             codex_cli=codex_cli,
         )

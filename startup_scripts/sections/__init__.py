@@ -12,7 +12,7 @@ from .posthog import (
     get_docker_services,
     get_start_script,
 )
-from .shell import get_makefile, get_bashrc, get_sysctl_and_docker_pull, get_final_message
+from .shell import get_makefile, get_bashrc, get_git_config, get_sysctl_and_docker_pull, get_final_message
 
 __all__ = [
     # Base
@@ -41,6 +41,7 @@ __all__ = [
     # Shell
     "get_makefile",
     "get_bashrc",
+    "get_git_config",
     "get_sysctl_and_docker_pull",
     "get_final_message",
 ]

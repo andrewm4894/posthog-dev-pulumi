@@ -1,5 +1,6 @@
 """Shell configuration: Makefile, bashrc, sysctl, and final message."""
 
+from config import GitConfig
 from constants import SYSCTL_SETTINGS
 
 
@@ -162,6 +163,26 @@ PROFILEEOF
 
 chown ph:ph /home/ph/.bashrc
 section_end "Bashrc"
+'''
+
+
+def get_git_config(git_config: GitConfig) -> str:
+    """Generate Git identity configuration for the ph user."""
+    if not git_config.user_name and not git_config.user_email:
+        return ""
+
+    user_name = git_config.user_name.replace('"', '\\"')
+    user_email = git_config.user_email.replace('"', '\\"')
+
+    return f'''
+section_start "Git Config"
+if [ -n "{user_name}" ]; then
+    su - ph -c "git config --global user.name \\\"{user_name}\\\""
+fi
+if [ -n "{user_email}" ]; then
+    su - ph -c "git config --global user.email \\\"{user_email}\\\""
+fi
+section_end "Git Config"
 '''
 
 

@@ -84,6 +84,14 @@ class GitHubCliConfig:
 
 
 @dataclass
+class GitConfig:
+    """Git identity configuration for the ph user."""
+
+    user_name: str = ""
+    user_email: str = ""
+
+
+@dataclass
 class VMsYamlConfig:
     """Configuration loaded from vms.yaml file."""
 
@@ -262,6 +270,21 @@ def load_github_cli_config(config: Config) -> GitHubCliConfig:
     return GitHubCliConfig(
         enabled=github_cli.get("enabled", True),
         token_secret_name=github_cli.get("secret_name", token_secret_name),
+    )
+
+
+def load_git_config(config: Config) -> GitConfig:
+    """Load Git identity configuration from Pulumi config.
+
+    Returns:
+        GitConfig with user.name and user.email.
+    """
+    user_name = config.get("gitUserName") or ""
+    user_email = config.get("gitUserEmail") or ""
+
+    return GitConfig(
+        user_name=user_name,
+        user_email=user_email,
     )
 
 

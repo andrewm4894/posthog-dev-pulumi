@@ -4,7 +4,7 @@ This module assembles the startup script from modular sections for easier
 maintenance and extension. Each section is defined in the sections/ directory.
 """
 
-from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
+from config import ClaudeCodeConfig, CodexCliConfig, GitConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
 
 from .sections import (
     # Base system setup
@@ -33,6 +33,7 @@ from .sections import (
     # Shell
     get_makefile,
     get_bashrc,
+    get_git_config,
     get_sysctl_and_docker_pull,
     get_final_message,
 )
@@ -45,6 +46,7 @@ def generate_startup_script(
     monitoring: MonitoringConfig | None = None,
     claude_code: ClaudeCodeConfig | None = None,
     github_cli: GitHubCliConfig | None = None,
+    git_config: GitConfig | None = None,
     remote_desktop: RemoteDesktopConfig | None = None,
     codex_cli: CodexCliConfig | None = None,
 ) -> str:
@@ -74,6 +76,8 @@ def generate_startup_script(
         enable_minimal_mode: Whether to configure for minimal mode
         monitoring: Monitoring agents configuration
         claude_code: Claude Code installation configuration
+        github_cli: GitHub CLI installation configuration
+        git_config: Git identity configuration
         remote_desktop: Remote desktop (xrdp) configuration
         codex_cli: OpenAI Codex CLI installation configuration
 
@@ -85,6 +89,7 @@ def generate_startup_script(
     monitoring = monitoring or MonitoringConfig()
     claude_code = claude_code or ClaudeCodeConfig()
     github_cli = github_cli or GitHubCliConfig()
+    git_config = git_config or GitConfig()
     remote_desktop = remote_desktop or RemoteDesktopConfig()
     codex_cli = codex_cli or CodexCliConfig()
 
@@ -173,6 +178,7 @@ echo "section,duration_sec,total_elapsed_sec" > "$TIMING_FILE"
 {get_codex_cli_config(codex_cli)}
 {get_docker_services()}
 {get_makefile()}
+{get_git_config(git_config)}
 {get_start_script()}
 {get_bashrc()}
 {get_sysctl_and_docker_pull()}
