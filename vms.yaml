@@ -7,13 +7,12 @@ defaults:
   disk_size_gb: 100
   posthog_branch: master
   enable_minimal_mode: false
+  os_image: "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
   # Optional: extra repos to clone under /home/ph (branch omitted uses default)
   additional_repos:
     - url: "https://github.com/posthog/posthog.com.git"
     - url: "https://github.com/posthog/posthog-js.git"
     - url: "https://github.com/posthog/posthog-python.git"
-  # Optional: custom image to speed up provisioning (supports ${GCP_PROJECT})
-  # os_image: "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
   # Or set globally via Pulumi config:
   #   pulumi config set baseImage "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
 
