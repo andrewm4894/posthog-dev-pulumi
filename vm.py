@@ -1,5 +1,6 @@
 """VM resource definitions for PostHog development."""
 
+from pulumi import ResourceOptions
 from pulumi_gcp import compute
 
 from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, VMConfig
@@ -90,4 +91,5 @@ def create_dev_vm(
         allow_stopping_for_update=True,
         # Deletion protection off for dev VMs
         deletion_protection=False,
+        opts=ResourceOptions(delete_before_replace=True),
     )
