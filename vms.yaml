@@ -62,14 +62,14 @@ github_cli:
 
 # VM definitions
 # Uncomment and modify to create VMs
-vms:
-  - name: posthog-master
-    description: "PostHog master branch"
-    # posthog_branch: master  # uses default
+# vms:
+#   - name: posthog-master
+#     description: "PostHog master branch"
+#     # posthog_branch: master  # uses default
 
-  # - name: posthog-feat-llma-bool-evals-with-na
-  #   description: "PostHog feature branch - LLM bool evals with NA"
-  #   posthog_branch: feat/llma-bool-evals-with-na
+#   - name: posthog-feat-llma-bool-evals-with-na
+#     description: "PostHog feature branch - LLM bool evals with NA"
+#     posthog_branch: feat/llma-bool-evals-with-na
 
   # Example: PR review VM
   # - name: posthog-pr-1234
