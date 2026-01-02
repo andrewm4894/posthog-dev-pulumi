@@ -1,6 +1,6 @@
-"""Developer tools: Claude Code and OpenAI Codex CLI."""
+"""Developer tools: Claude Code, GitHub CLI, and OpenAI Codex CLI."""
 
-from config import ClaudeCodeConfig, CodexCliConfig
+from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig
 
 
 def get_claude_code(claude_code: ClaudeCodeConfig) -> str:
@@ -38,6 +38,41 @@ CLAUDEENVEOF
 chown -R ph:ph /home/ph/.claude
 section_end "Claude Code"
 '''
+
+
+def get_github_cli(github_cli: GitHubCliConfig) -> str:
+    """Generate GitHub CLI install and configuration section."""
+    if not github_cli.enabled:
+        return ""
+
+    # Base install script (always run if enabled)
+    script = '''
+section_start "GitHub CLI"
+
+# Add GitHub CLI apt repository
+mkdir -p -m 755 /etc/apt/keyrings
+wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update
+apt-get install -y gh
+'''
+
+    # Add token configuration if provided
+    if github_cli.token:
+        script += f'''
+# Set GitHub token for authentication
+cat >> /home/ph/.bashrc << 'GHENVEOF'
+
+# GitHub CLI configuration
+export GH_TOKEN="{github_cli.token}"
+GHENVEOF
+'''
+
+    script += '''
+section_end "GitHub CLI"
+'''
+    return script
 
 
 def get_codex_cli_config(codex_cli: CodexCliConfig) -> str:

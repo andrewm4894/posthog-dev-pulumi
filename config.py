@@ -74,6 +74,14 @@ class CodexCliConfig:
 
 
 @dataclass
+class GitHubCliConfig:
+    """Configuration for GitHub CLI installation."""
+
+    enabled: bool = True
+    token: str = ""  # Loaded from Pulumi secret
+
+
+@dataclass
 class VMsYamlConfig:
     """Configuration loaded from vms.yaml file."""
 
@@ -83,6 +91,7 @@ class VMsYamlConfig:
     claude_code: dict
     remote_desktop: dict
     codex_cli: dict
+    github_cli: dict
 
 
 def _load_yaml_config() -> Optional[VMsYamlConfig]:
@@ -101,6 +110,7 @@ def _load_yaml_config() -> Optional[VMsYamlConfig]:
         claude_code=data.get("claude_code", {}),
         remote_desktop=data.get("remote_desktop", {}),
         codex_cli=data.get("codex_cli", {}),
+        github_cli=data.get("github_cli", {}),
     )
 
 
@@ -230,6 +240,24 @@ def load_codex_cli_config(config: Config) -> CodexCliConfig:
     return CodexCliConfig(
         enabled=codex_cli.get("enabled", True),
         api_key=api_key,
+    )
+
+
+def load_github_cli_config(config: Config) -> GitHubCliConfig:
+    """Load GitHub CLI configuration from vms.yaml and Pulumi secrets.
+
+    Returns:
+        GitHubCliConfig with GitHub CLI settings
+    """
+    yaml_config = _load_yaml_config()
+    github_cli = yaml_config.github_cli if yaml_config else {}
+
+    # Token is stored as a Pulumi secret
+    token = config.get("githubToken") or ""
+
+    return GitHubCliConfig(
+        enabled=github_cli.get("enabled", True),
+        token=token,
     )
 
 

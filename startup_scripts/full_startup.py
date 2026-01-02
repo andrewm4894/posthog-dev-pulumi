@@ -4,7 +4,7 @@ This module assembles the startup script from modular sections for easier
 maintenance and extension. Each section is defined in the sections/ directory.
 """
 
-from config import ClaudeCodeConfig, CodexCliConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
+from config import ClaudeCodeConfig, CodexCliConfig, GitHubCliConfig, MonitoringConfig, RemoteDesktopConfig, RepoConfig
 
 from .sections import (
     # Base system setup
@@ -18,6 +18,7 @@ from .sections import (
     get_netdata_install,
     # Tools
     get_claude_code,
+    get_github_cli,
     get_codex_cli_config,
     # Remote Desktop
     get_remote_desktop_install,
@@ -43,6 +44,7 @@ def generate_startup_script(
     enable_minimal_mode: bool = False,
     monitoring: MonitoringConfig | None = None,
     claude_code: ClaudeCodeConfig | None = None,
+    github_cli: GitHubCliConfig | None = None,
     remote_desktop: RemoteDesktopConfig | None = None,
     codex_cli: CodexCliConfig | None = None,
 ) -> str:
@@ -82,6 +84,7 @@ def generate_startup_script(
     additional_repos = additional_repos or []
     monitoring = monitoring or MonitoringConfig()
     claude_code = claude_code or ClaudeCodeConfig()
+    github_cli = github_cli or GitHubCliConfig()
     remote_desktop = remote_desktop or RemoteDesktopConfig()
     codex_cli = codex_cli or CodexCliConfig()
 
@@ -134,6 +137,7 @@ echo "section,duration_sec,total_elapsed_sec" > "$TIMING_FILE"
 {get_docker_install()}
 {get_user_creation()}
 {get_claude_code(claude_code)}
+{get_github_cli(github_cli)}
 {get_remote_desktop_config(remote_desktop)}
 {get_system_deps()}
 {get_flox_install()}

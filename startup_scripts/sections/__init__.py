@@ -2,7 +2,7 @@
 
 from .base import get_system_updates, get_docker_install, get_flox_install, get_system_deps, get_user_creation
 from .monitoring import get_ops_agent_install, get_netdata_install
-from .tools import get_claude_code, get_codex_cli_config
+from .tools import get_claude_code, get_github_cli, get_codex_cli_config
 from .remote_desktop import get_remote_desktop_install, get_remote_desktop_config
 from .posthog import (
     get_clone_repos,
@@ -26,6 +26,7 @@ __all__ = [
     "get_netdata_install",
     # Tools
     "get_claude_code",
+    "get_github_cli",
     "get_codex_cli_config",
     # Remote Desktop
     "get_remote_desktop_install",
