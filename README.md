@@ -35,12 +35,17 @@ pulumi stack select dev
 pulumi config set gcp:project YOUR_PROJECT_ID
 pulumi config set gcp:region europe-west1
 
-# Set password for Remote Desktop (used for sudo)
-pulumi config set --secret rdpPassword "YourSecurePassword"
+# (Optional) Store RDP sudo password in Secret Manager
+echo -n "YourSecurePassword" | gcloud secrets create rdp-password --data-file=-
+pulumi config set rdpPasswordSecretName "rdp-password"
 
-# (Optional) Set API keys for AI coding tools
-pulumi config set --secret anthropicApiKey "sk-ant-..."
-pulumi config set --secret openaiApiKey "sk-..."
+# (Optional) Store API keys in Secret Manager
+echo -n "sk-ant-..." | gcloud secrets create anthropic-api-key --data-file=-
+echo -n "sk-..." | gcloud secrets create openai-api-key --data-file=-
+
+# Reference secret names in config (vms.yaml or Pulumi config)
+pulumi config set anthropicSecretName "anthropic-api-key"
+pulumi config set openaiSecretName "openai-api-key"
 
 # Deploy
 pulumi up
@@ -57,6 +62,8 @@ defaults:
   machine_type: e2-standard-8
   disk_size_gb: 100
   posthog_branch: master
+  # Optional: use a custom GCE image for faster bootstraps
+  # os_image: "projects/YOUR_PROJECT/global/images/posthog-dev-base-YYYYMMDD"
 
 vms:
   - name: posthog-dev-1
@@ -77,14 +84,32 @@ pulumi config set machineType e2-standard-4
 pulumi config set diskSizeGb 150
 ```
 
-### Secrets & User Config (via Pulumi only)
+### Secrets & User Config (via Secret Manager)
 
 ```bash
-pulumi config set --secret rdpPassword "PASSWORD"      # Required for Chrome Remote Desktop
-pulumi config set --secret anthropicApiKey "KEY"       # Optional: Claude Code
-pulumi config set --secret openaiApiKey "KEY"          # Optional: Codex CLI
 pulumi config set netdataClaimRooms "ROOM_ID"          # Optional: Netdata room ID
-pulumi config set --secret netdataClaimToken "TOKEN"   # Optional: Netdata claim token
+
+# Store secrets in Secret Manager
+echo -n "PASSWORD" | gcloud secrets create rdp-password --data-file=-
+echo -n "TOKEN" | gcloud secrets create netdata-claim-token --data-file=-
+echo -n "KEY" | gcloud secrets create anthropic-api-key --data-file=-
+echo -n "KEY" | gcloud secrets create openai-api-key --data-file=-
+echo -n "TOKEN" | gcloud secrets create github-token --data-file=-
+
+# Reference secret names in config (vms.yaml or Pulumi config)
+pulumi config set rdpPasswordSecretName "rdp-password"
+pulumi config set netdataClaimTokenSecretName "netdata-claim-token"
+pulumi config set anthropicSecretName "anthropic-api-key"
+pulumi config set openaiSecretName "openai-api-key"
+pulumi config set githubTokenSecretName "github-token"
+```
+
+Grant the VM service account access to the secrets (Secret Manager Secret Accessor), e.g.:
+```bash
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+SA="$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+gcloud secrets add-iam-policy-binding anthropic-api-key \
+  --member="serviceAccount:$SA" --role="roles/secretmanager.secretAccessor"
 ```
 
 ## Connecting to Your VM
@@ -142,6 +167,25 @@ VMs have no external IP addresses. Access is via:
 - **Desktop**: Chrome Remote Desktop - uses Google's secure HTTPS relay
 
 Cloud NAT provides outbound internet access for the VMs.
+
+## Custom Base Images (Optional)
+
+To speed up provisioning, you can bake a GCE image from a fully provisioned VM.
+If `os_image` is not set, the default Ubuntu image is used (full bootstrap).
+
+```bash
+# Create an image from an existing VM
+make bake-image VM=posthog-master IMAGE=posthog-dev-base
+
+# Use it as the default image for new VMs (supports ${GCP_PROJECT})
+pulumi config set baseImage "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
+```
+
+When you bake an image, the VM is marked with `/etc/posthog-base-image`.
+On boot, the startup script detects this marker and skips heavy steps
+(repo clone, Flox activation, Docker services, and image pre-pull).
+
+Refresh the image whenever you update startup scripts or dependencies.
 
 ## Cleanup
 

@@ -24,6 +24,12 @@ pulumi destroy
 # Create a new VM stack
 make new-vm NAME=my-feature BRANCH=feature-branch
 
+# Bake a custom image from a provisioned VM
+make bake-image VM=posthog-master IMAGE=posthog-dev-base
+
+# Set baked image as the default for new VMs (supports ${GCP_PROJECT})
+pulumi config set baseImage "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
+
 # List all stacks
 make stacks
 
@@ -47,10 +53,11 @@ VMs can be configured in two ways:
 Secrets and user-specific config must be stored via Pulumi (not in vms.yaml):
 ```bash
 pulumi config set netdataClaimRooms "ROOM_ID"            # Your Netdata room ID
-pulumi config set --secret netdataClaimToken "TOKEN"     # Netdata claim token
-pulumi config set --secret anthropicApiKey "KEY"         # Claude Code API key
-pulumi config set --secret openaiApiKey "KEY"            # Codex CLI API key
-pulumi config set --secret rdpPassword "PASSWORD"        # For sudo in Chrome Remote Desktop
+pulumi config set netdataClaimTokenSecretName "TOKEN"    # Secret Manager secret name
+pulumi config set anthropicSecretName "KEY"              # Secret Manager secret name
+pulumi config set openaiSecretName "KEY"                 # Secret Manager secret name
+pulumi config set githubTokenSecretName "TOKEN"          # Secret Manager secret name
+pulumi config set rdpPasswordSecretName "PASSWORD"       # Optional: sudo in Chrome Remote Desktop
 ```
 
 ## Architecture
