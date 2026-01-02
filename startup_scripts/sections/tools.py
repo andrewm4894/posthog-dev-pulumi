@@ -99,7 +99,7 @@ def get_codex_cli_config(codex_cli: CodexCliConfig) -> str:
 section_start "Codex CLI"
 
 # Install Codex CLI to user-local npm prefix to avoid Nix store perms
-su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- npm config set prefix /home/ph/.local && npm install -g @openai/codex" || true
+su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bash -lc 'npm config set prefix /home/ph/.local && npm install -g @openai/codex'" || true
 
 # Store OpenAI API key in secrets file
 install -d -m 700 /home/ph/.config/posthog

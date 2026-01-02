@@ -116,15 +116,16 @@ PROJECT_ID=$(curl -s -H "Metadata-Flavor: Google" \
 fetch_secret() {{
     local secret_name="$1"
     if [ -z "$secret_name" ]; then
-        return 1
-    fi
+        echo ""
+    else
     local token
     token=$(curl -s -H "Metadata-Flavor: Google" \
         http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | \
         python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-    curl -s -H "Authorization: Bearer $token" \
-        "https://secretmanager.googleapis.com/v1/projects/${{PROJECT_ID}}/secrets/${{secret_name}}/versions/latest:access" | \
-        python3 -c 'import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode())'
+        curl -s -H "Authorization: Bearer $token" \
+            "https://secretmanager.googleapis.com/v1/projects/${{PROJECT_ID}}/secrets/${{secret_name}}/versions/latest:access" | \
+            python3 -c 'import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode())'
+    fi
 }}
 
 # Timing functions for measuring section duration
