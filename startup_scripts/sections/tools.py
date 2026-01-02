@@ -45,6 +45,13 @@ export DISABLE_AUTOUPDATER=1
 export PATH="$HOME/.local/bin:$PATH"
 CLAUDEENVEOF
 
+# Install a global wrapper so `claude` works from any directory
+cat > /usr/local/bin/claude << 'CLAUDEWRAPEOF'
+#!/bin/bash
+exec /home/ph/.local/bin/claude "$@"
+CLAUDEWRAPEOF
+chmod 755 /usr/local/bin/claude
+
 chown -R ph:ph /home/ph/.claude /home/ph/.config/posthog
 section_end "Claude Code"
 '''
@@ -100,6 +107,13 @@ section_start "Codex CLI"
 
 # Install Codex CLI to user-local npm prefix to avoid Nix store perms
 su - ph -c "cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- bash -lc 'npm config set prefix /home/ph/.local && npm install -g @openai/codex'" || true
+
+# Install a global wrapper so `codex` works from any directory
+cat > /usr/local/bin/codex << 'CODEXWRAPEOF'
+#!/bin/bash
+exec /usr/bin/env bash -lc 'cd /home/ph/posthog && FLOX_NO_DIRENV_SETUP=1 flox activate -- /home/ph/.local/bin/codex "$@"'
+CODEXWRAPEOF
+chmod 755 /usr/local/bin/codex
 
 # Store OpenAI API key in secrets file
 install -d -m 700 /home/ph/.config/posthog
