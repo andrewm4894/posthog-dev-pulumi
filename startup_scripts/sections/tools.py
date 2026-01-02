@@ -3,30 +3,21 @@
 from config import ClaudeCodeConfig, CodexCliConfig
 
 
-def get_claude_code_install(claude_code: ClaudeCodeConfig) -> str:
-    """Generate Claude Code binary installation section (run before user creation)."""
-    if not claude_code.enabled or not claude_code.api_key:
-        return ""
-
-    return '''
-section_start "Claude Code Install"
-curl -fsSL https://claude.ai/install.sh | bash
-section_end "Claude Code Install"
-'''
-
-
-def get_claude_code_config(claude_code: ClaudeCodeConfig) -> str:
-    """Generate Claude Code user configuration section (run after user creation)."""
+def get_claude_code(claude_code: ClaudeCodeConfig) -> str:
+    """Generate Claude Code install and configuration section (run after user creation)."""
     if not claude_code.enabled or not claude_code.api_key:
         return ""
 
     return f'''
-section_start "Claude Code Config"
+section_start "Claude Code"
 
-# Create Claude Code configuration directory for ph user
+# Install Claude Code as ph user (installs to ~/.local/bin/claude)
+su - ph -c "curl -fsSL https://claude.ai/install.sh | bash"
+
+# Create Claude Code configuration directory
 mkdir -p /home/ph/.claude
 
-# Create settings.json with API key and permissions for headless use
+# Create settings.json with pre-approved permissions for headless use
 cat > /home/ph/.claude/settings.json << 'CLAUDEEOF'
 {{
   "permissions": {{
@@ -35,17 +26,17 @@ cat > /home/ph/.claude/settings.json << 'CLAUDEEOF'
 }}
 CLAUDEEOF
 
-# Set environment variable for API key in user's profile
+# Set environment variables for headless use
 cat >> /home/ph/.bashrc << 'CLAUDEENVEOF'
 
 # Claude Code configuration
-export ANTHROPIC_API_KEY="{claude_code.api_key}"
+export CLAUDE_CODE_API_KEY="{claude_code.api_key}"
+export DISABLE_AUTOUPDATER=1
 export PATH="$HOME/.local/bin:$PATH"
-alias claude='~/.local/bin/claude'
 CLAUDEENVEOF
 
 chown -R ph:ph /home/ph/.claude
-section_end "Claude Code Config"
+section_end "Claude Code"
 '''
 
 

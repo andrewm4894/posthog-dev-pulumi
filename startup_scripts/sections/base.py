@@ -34,8 +34,15 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/
 # Set up the repository
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+# Install Docker packages with retry (CDN propagation can cause transient 404s)
+for i in 1 2 3; do
+    apt-get update
+    if apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+        break
+    fi
+    echo "Docker install attempt $i failed, retrying in 30s..."
+    sleep 30
+done
 
 # Configure Docker for better performance
 cat > /etc/docker/daemon.json << 'DOCKEREOF'

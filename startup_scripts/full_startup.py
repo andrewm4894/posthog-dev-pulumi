@@ -17,8 +17,7 @@ from .sections import (
     get_ops_agent_install,
     get_netdata_install,
     # Tools
-    get_claude_code_install,
-    get_claude_code_config,
+    get_claude_code,
     get_codex_cli_config,
     # Remote Desktop
     get_remote_desktop_install,
@@ -131,11 +130,10 @@ echo "section,duration_sec,total_elapsed_sec" > "$TIMING_FILE"
 {get_system_updates()}
 {get_ops_agent_install(monitoring)}
 {get_netdata_install(monitoring)}
-{get_claude_code_install(claude_code)}
 {get_remote_desktop_install(remote_desktop)}
 {get_docker_install()}
 {get_user_creation()}
-{get_claude_code_config(claude_code)}
+{get_claude_code(claude_code)}
 {get_remote_desktop_config(remote_desktop)}
 {get_system_deps()}
 {get_flox_install()}
