@@ -51,7 +51,11 @@ cat > /usr/local/bin/claude << 'CLAUDEWRAPEOF'
 if [ "$(id -un)" = "ph" ]; then
     exec /home/ph/.local/bin/claude "$@"
 fi
-exec runuser -u ph -- /home/ph/.local/bin/claude "$@"
+if command -v sudo >/dev/null 2>&1; then
+    exec sudo -n -iu ph /home/ph/.local/bin/claude "$@"
+fi
+echo "claude: sudo is required to run as ph user"
+exit 1
 CLAUDEWRAPEOF
 chmod 755 /usr/local/bin/claude
 
