@@ -98,7 +98,7 @@ def generate_startup_script(
 # See: https://posthog.com/handbook/engineering/developing-locally#setup-with-flox-recommended
 #
 set -euo pipefail
-export HOME="${HOME:-/root}"
+export HOME="${{HOME:-/root}}"
 
 LOG_FILE="/var/log/posthog-startup.log"
 TIMING_FILE="/var/log/posthog-startup-timing.log"
