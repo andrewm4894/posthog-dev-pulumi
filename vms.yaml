@@ -13,6 +13,7 @@ defaults:
     - url: "https://github.com/posthog/posthog.com.git"
     - url: "https://github.com/posthog/posthog-js.git"
     - url: "https://github.com/posthog/posthog-python.git"
+    - url: "https://github.com/posthog/llm-analytics-apps.git"
   # Or set globally via Pulumi config:
   #   pulumi config set baseImage "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
 

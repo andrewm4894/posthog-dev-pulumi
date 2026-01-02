@@ -34,7 +34,6 @@ if [ -d /home/ph/posthog/.git ]; then
     else
         su - ph -c "cd /home/ph/posthog && git checkout master || echo 'Warning: could not checkout master'; git pull --ff-only || echo 'Warning: could not fast-forward master'"
     fi
-    section_end "Clone Repositories"
 else
 # Check if branch exists remotely
 if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
@@ -50,8 +49,13 @@ fi
 
 chown -R ph:ph /home/ph/posthog
 
-{additional_clone_commands}
+fi
 section_end "Clone Repositories"
+
+if [ -n "{' '.join([r.url for r in additional_repos])}" ]; then
+    section_start "Clone Additional Repositories"
+{additional_clone_commands}
+    section_end "Clone Additional Repositories"
 fi
 '''
 
