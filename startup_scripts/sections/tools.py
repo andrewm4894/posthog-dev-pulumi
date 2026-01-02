@@ -48,7 +48,10 @@ CLAUDEENVEOF
 # Install a global wrapper so `claude` works from any directory
 cat > /usr/local/bin/claude << 'CLAUDEWRAPEOF'
 #!/bin/bash
-exec /home/ph/.local/bin/claude "$@"
+if [ "$(id -un)" = "ph" ]; then
+    exec /home/ph/.local/bin/claude "$@"
+fi
+exec runuser -u ph -- /home/ph/.local/bin/claude "$@"
 CLAUDEWRAPEOF
 chmod 755 /usr/local/bin/claude
 
