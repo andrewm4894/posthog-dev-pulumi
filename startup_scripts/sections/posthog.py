@@ -4,8 +4,16 @@ from config import RepoConfig
 from constants import POSTHOG_ENV_DEFAULTS
 
 
-def get_clone_repos(posthog_branch: str, additional_repos: list[RepoConfig]) -> str:
-    """Generate repository cloning section."""
+def get_clone_repos(posthog_repo: str, posthog_branch: str, additional_repos: list[RepoConfig]) -> str:
+    """Generate repository cloning section.
+
+    Args:
+        posthog_repo: GitHub org/repo for PostHog (e.g., "posthog/posthog" or "andrewm4894/posthog")
+        posthog_branch: Branch to checkout
+        additional_repos: Additional repositories to clone
+    """
+    repo_url = f"https://github.com/{posthog_repo}.git"
+
     additional_clone_commands = ""
     for repo in additional_repos:
         branch_flag = f"--branch {repo.branch} " if repo.branch else ""
@@ -24,24 +32,26 @@ fi
     return f'''
 section_start "Clone Repositories"
 
+echo "Using PostHog repo: {posthog_repo}"
+
 # If repo exists, update it to latest
 if [ -d /home/ph/posthog/.git ]; then
     echo "PostHog repo already exists; fetching latest"
     su - ph -c "git config --global --add safe.directory /home/ph/posthog"
     su - ph -c "cd /home/ph/posthog && git fetch origin"
-    if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
+    if git ls-remote --heads {repo_url} {posthog_branch} | grep -q {posthog_branch}; then
         su - ph -c "cd /home/ph/posthog && git checkout {posthog_branch} || echo 'Warning: could not checkout {posthog_branch}'; git pull --ff-only || echo 'Warning: could not fast-forward {posthog_branch}'"
     else
         su - ph -c "cd /home/ph/posthog && git checkout master || echo 'Warning: could not checkout master'; git pull --ff-only || echo 'Warning: could not fast-forward master'"
     fi
 else
 # Check if branch exists remotely
-if git ls-remote --heads https://github.com/posthog/posthog.git {posthog_branch} | grep -q {posthog_branch}; then
+if git ls-remote --heads {repo_url} {posthog_branch} | grep -q {posthog_branch}; then
     echo "Branch '{posthog_branch}' exists, cloning directly"
-    git clone --branch {posthog_branch} https://github.com/posthog/posthog.git /home/ph/posthog
+    git clone --branch {posthog_branch} {repo_url} /home/ph/posthog
 else
     echo "Branch '{posthog_branch}' does not exist, cloning master and creating new branch"
-    git clone https://github.com/posthog/posthog.git /home/ph/posthog
+    git clone {repo_url} /home/ph/posthog
     cd /home/ph/posthog
     git checkout -b {posthog_branch}
     cd /

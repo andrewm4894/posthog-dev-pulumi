@@ -102,18 +102,8 @@ if [[ -f "$HOME/.config/posthog/secrets.env" ]]; then
     set +a
 fi
 
-# Auto-activate Flox when entering PostHog directory
-cd() {
-    builtin cd "$@"
-    if [[ "$PWD" == "$POSTHOG_DIR"* ]] && [[ -d "$POSTHOG_DIR/.flox" ]]; then
-        if [[ -z "$FLOX_ENV" ]]; then
-            echo "Activating Flox environment..."
-            eval "$(FLOX_NO_DIRENV_SETUP=1 flox activate)"
-        fi
-    fi
-}
-
 # Convenience aliases
+# Use 'floxsh' to manually activate Flox environment
 alias ph='cd $POSTHOG_DIR'
 alias phattach='screen -r ph'
 alias phstart='cd $POSTHOG_DIR && FLOX_NO_DIRENV_SETUP=1 flox activate -- hogli start --custom bin/mprocs-with-logging.yaml'
@@ -133,6 +123,7 @@ echo ""
 echo "PostHog is running in a screen session!"
 echo ""
 echo "Quick commands:"
+echo "  floxsh      - Activate Flox environment (manual)"
 echo "  phattach    - Attach to running PostHog (screen session)"
 echo "  phtail      - Tail all PostHog log files"
 echo "  phlogs      - View Docker container logs"

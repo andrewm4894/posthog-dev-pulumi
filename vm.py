@@ -36,6 +36,7 @@ def create_dev_vm(
     """
     # Generate the startup script based on configuration
     startup_script = generate_startup_script(
+        posthog_repo=vm_config.posthog_repo,
         posthog_branch=vm_config.posthog_branch,
         additional_repos=vm_config.additional_repos,
         enable_minimal_mode=vm_config.enable_minimal_mode,

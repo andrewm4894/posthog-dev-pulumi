@@ -34,6 +34,7 @@ class VMConfig:
     machine_type: str = "e2-standard-8"
     disk_size_gb: int = 100
     os_image: str = "ubuntu-os-cloud/ubuntu-2204-lts"
+    posthog_repo: str = "posthog/posthog"  # GitHub org/repo for PostHog clone
     posthog_branch: str = "master"
     additional_repos: list[RepoConfig] = field(default_factory=list)
     enable_minimal_mode: bool = False
@@ -160,6 +161,7 @@ def load_vm_configs(config: Config) -> list[VMConfig]:
     os_image = config.get("osImage") or base_image or "ubuntu-os-cloud/ubuntu-2204-lts"
     if gcp_project and isinstance(os_image, str):
         os_image = _interpolate_project(os_image, gcp_project)
+    posthog_repo = config.get("posthogRepo") or "posthog/posthog"
     posthog_branch = config.get("posthogBranch") or "master"
     enable_minimal = config.get_bool("enableMinimalMode") or False
 
@@ -177,6 +179,7 @@ def load_vm_configs(config: Config) -> list[VMConfig]:
             machine_type=machine_type,
             disk_size_gb=disk_size_gb,
             os_image=os_image,
+            posthog_repo=posthog_repo,
             posthog_branch=posthog_branch,
             additional_repos=additional_repos,
             enable_minimal_mode=enable_minimal,
@@ -314,6 +317,7 @@ def _parse_vm_config(data: dict, defaults: Optional[dict] = None, project: str =
         machine_type=get("machine_type", "e2-standard-8"),
         disk_size_gb=get("disk_size_gb", 100),
         os_image=os_image,
+        posthog_repo=get("posthog_repo", "posthog/posthog"),
         posthog_branch=get("posthog_branch", "master"),
         additional_repos=additional_repos,
         enable_minimal_mode=get("enable_minimal_mode", False),

@@ -94,6 +94,8 @@ fi
 if [ -n "$gh_token" ]; then
     printf 'GH_TOKEN=%s\n' "$gh_token" >> /home/ph/.config/posthog/secrets.env
     chmod 600 /home/ph/.config/posthog/secrets.env
+    # Configure git to use gh for authentication (enables git push via HTTPS)
+    su - ph -c "GH_TOKEN=$gh_token gh auth setup-git"
 fi
 chown -R ph:ph /home/ph/.config/posthog
 '''

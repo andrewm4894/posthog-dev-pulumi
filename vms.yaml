@@ -3,8 +3,9 @@
 
 # Default settings (applied to all VMs unless overridden)
 defaults:
-  machine_type: e2-standard-8
+  machine_type: n2-standard-16
   disk_size_gb: 100
+  posthog_repo: andrewm4894/posthog  # Use fork for easy git push
   posthog_branch: master
   enable_minimal_mode: false
   os_image: "projects/${GCP_PROJECT}/global/images/posthog-dev-base"
@@ -62,14 +63,14 @@ github_cli:
 
 # VM definitions
 # Uncomment and modify to create VMs
-# vms:
-#   - name: posthog-master
-#     description: "PostHog master branch"
-#     # posthog_branch: master  # uses default
+vms:
+  - name: posthog-master
+    description: "PostHog master branch"
+    # posthog_branch: master  # uses default
 
-#   - name: posthog-feat-llma-bool-evals-with-na
-#     description: "PostHog feature branch - LLM bool evals with NA"
-#     posthog_branch: feat/llma-bool-evals-with-na
+  - name: posthog-feat-llma-bool-evals-with-na
+    description: "PostHog feature branch - LLM bool evals with NA"
+    posthog_branch: feat/llma-bool-evals-with-na
 
   # Example: PR review VM
   # - name: posthog-pr-1234

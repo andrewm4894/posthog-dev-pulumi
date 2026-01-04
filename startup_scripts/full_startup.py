@@ -40,6 +40,7 @@ from .sections import (
 
 
 def generate_startup_script(
+    posthog_repo: str = "posthog/posthog",
     posthog_branch: str = "master",
     additional_repos: list[RepoConfig] | None = None,
     enable_minimal_mode: bool = False,
@@ -171,7 +172,7 @@ echo "section,duration_sec,total_elapsed_sec" > "$TIMING_FILE"
 {get_remote_desktop_config(remote_desktop)}
 {get_system_deps()}
 {get_flox_install()}
-{get_clone_repos(posthog_branch, additional_repos)}
+{get_clone_repos(posthog_repo, posthog_branch, additional_repos)}
 {get_posthog_env(enable_minimal_mode)}
 {get_hosts_config()}
 {get_flox_activate()}
